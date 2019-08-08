@@ -1,4 +1,6 @@
 # Gochan: A little package that can stream events to the web
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frajveermalviya%2Fgochan.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Frajveermalviya%2Fgochan?ref=badge_shield)
+
 
 gochan is a small package for relaying pubsub messages to the web via
 [SSE(Eventsource)](https://en.wikipedia.org/wiki/Server-sent_events).
@@ -97,3 +99,7 @@ func main() {
 If you are able to contribute, that is the best way to show some love towards the project.
 
 If you **love** gochan, you can support by sharing the project on Twitter or sponsor the project via [PayPal](https://paypal.me/rajveermalviya).
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frajveermalviya%2Fgochan.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Frajveermalviya%2Fgochan?ref=badge_large)
