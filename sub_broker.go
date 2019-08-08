@@ -55,6 +55,7 @@ func (b *subscriptionsBroker) SubscribeClient(c *client, topic string) error {
 		return nil
 	}
 
+	// Use background context because subscriptions need to stay forever, until shutdown.
 	ctx := context.Background()
 
 	// When the subscription does not exists, open a new subscription.

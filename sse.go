@@ -15,7 +15,7 @@
 // It provides two net/http handler functions ->
 //  EventStreamHandler: It is a SSE compatible http handler, that streams all the messages.
 //  UpdateSubscriptionsHandler: It update the client's subscriptions.
-package gochan // import "github.com/rajveermalviya/gochan"
+package gochan
 
 import (
 	"encoding/json"
@@ -137,6 +137,12 @@ type updateSubscriptionsData struct {
 
 // UpdateSubscriptionsHandler is used to update the client's subscriptions.
 func (b *EventStreamBroker) UpdateSubscriptionsHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "POST" {
+		http.Error(w, "Only POST method allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	h := w.Header()
 	h.Set("Cache-Control", "no-cache")
 	h.Set("Connection", "keep-alive")

@@ -15,6 +15,12 @@ It uses the [Go CDK](https://gocloud.dev) as vendor neutral pubsub driver that s
 - Kafka
 - In-Memory (Testing)
 
+## Installation
+
+```shell
+go get github.com/rajveermalviya/gochan
+```
+
 ## Documentation
 
 For documentation check [godoc](https://godoc.org/github.com/rajveermalviya/gochan).
