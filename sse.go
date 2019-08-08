@@ -1,14 +1,21 @@
-// Package gochan is a micro-library for relaying pubsub messages to the web
-// via Server-Sent-Events or HTTP-EventSource.
+// Package gochan is a small package for relaying pubsub messages to the web
+// via SSE(EventSource).
 // It is loosely based on Twitter's implementation for real-time event-streaming
-// in their redesign.
-//  It uses GO CDK (gocloud.dev) for pubsub, so it supports various vendors ->
-//   Google Cloud Pub/Sub,  Amazon Simple Queueing Service (SQS),  Azure Service Bus
-//   RabbitMQ, NATS, Kafka, In-memory (testing).
-// It provides two net/http handler functions 'EventStreamHandler', 'UpdateSubscriptionsHandler'.
-// EventStreamHandler streams all the messages.
-// UpdateSubscriptionsHandler updates the client's subscriptions.
-package gochan
+// in their new desktop web app.
+//
+// It uses GO CDK (gocloud.dev) for pubsub, so it supports various vendors ->
+//   Google Cloud Pub/Sub
+//   Amazon Simple Queueing Service (SQS)
+//   Azure Service Bus
+//   RabbitMQ
+//   NATS
+//   Kafka
+//   In-memory (testing).
+//
+// It provides two net/http handler functions ->
+//  EventStreamHandler: It is a SSE compatible http handler, that streams all the messages.
+//  UpdateSubscriptionsHandler: It update the client's subscriptions.
+package gochan // import "github.com/rajveermalviya/gochan"
 
 import (
 	"encoding/json"
@@ -22,7 +29,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// EventStreamBroker manages all the client and their subscriptions.
+// EventStreamBroker manages all the clients and their respective subscriptions.
 type EventStreamBroker struct {
 	clients            map[string]*client
 	subscriptionBroker *subscriptionsBroker
