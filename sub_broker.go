@@ -3,6 +3,7 @@ package gochan
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 
@@ -48,14 +49,13 @@ func (b *subscriptionsBroker) SubscribeClient(c *client, topic string) error {
 		c.mu.Unlock()
 
 		sub.mu.RLock()
-		totalSubscribers := len(sub.clients)
+		log.Printf("Added new subscriber to topic '%v', total subscribers: %v\n", topic, len(sub.clients))
 		sub.mu.RUnlock()
 
-		log.Printf("Added new subscriber to topic '%v', total subscribers: %v\n", topic, totalSubscribers)
 		return nil
 	}
 
-	// Use background context because subscriptions need to stay forever, until shutdown.
+	// Use background context because subscriptions needs to stay forever, until shutdown.
 	ctx := context.Background()
 
 	// When the subscription does not exists, open a new subscription.
@@ -81,10 +81,8 @@ func (b *subscriptionsBroker) SubscribeClient(c *client, topic string) error {
 	c.mu.Unlock()
 
 	b.mu.RLock()
-	totalSubscriptions := len(b.subs)
+	log.Printf("Subscribed to new topic '%v', total subscriptions: %v\n", topic, len(b.subs))
 	b.mu.RUnlock()
-
-	log.Printf("Subscribed to new topic '%v', total subscriptions: %v\n", topic, totalSubscriptions)
 
 	log.Printf("Added new subscriber to topic '%v', total subscribers: %v\n", topic, len(newSub.clients))
 
@@ -105,50 +103,80 @@ func (b *subscriptionsBroker) streamMessages(ctx context.Context, topic string) 
 		sub, ok := b.subs[topic]
 		b.mu.RUnlock()
 		if !ok {
-			log.Printf("Error: subscription for topic '%v' does not exists.\n", topic)
 			break
 		}
+
+		// If there are no clients subscribed to the topic, then shutdown the subscription.
+		sub.mu.RLock()
+		if len(sub.clients) == 0 {
+			log.Printf("No subscribers for topic '%v', shuting down subscription of topic.\n", topic)
+			if err := sub.subscription.Shutdown(ctx); err != nil {
+				if err != context.Canceled {
+					log.Println("Error: Cannot recieve message:", err)
+				}
+			}
+			b.mu.Lock()
+			delete(b.subs, topic)
+			b.mu.Unlock()
+			sub.mu.RUnlock()
+			break
+		}
+		sub.mu.RUnlock()
 
 		// Recieve new message from the subscription.
 		sub.mu.RLock()
 		msg, err := sub.subscription.Receive(ctx)
-		sub.mu.RUnlock()
 		if err != nil {
 			if err != context.Canceled {
 				log.Println("Error: Cannot recieve message:", err)
+
+				for _, c := range sub.clients {
+					c.mu.Lock()
+					delete(c.topics, topic)
+					c.mu.Unlock()
+
+					d, _ := json.Marshal(map[string]interface{}{
+						"error": map[string]string{
+							"code":    "subscription-removed",
+							"message": fmt.Sprintf("Subscription forcefully removed of topic %v", topic),
+						},
+					})
+					c.writeChannel <- d
+				}
+
 				b.mu.Lock()
 				delete(b.subs, topic)
 				b.mu.Unlock()
 			}
+			sub.mu.RUnlock()
 			break
 		}
+		sub.mu.RUnlock()
 
 		// Loop over all the clients that are subscribed to this topic and
 		// write the recieved message to their writeChannels
 		sub.mu.RLock()
-		clients := sub.clients
-		sub.mu.RUnlock()
-
-		for _, client := range clients {
+		for _, client := range sub.clients {
 			d, err := json.Marshal(map[string]string{"topic": topic, "payload": string(msg.Body)})
 			if err != nil {
 				log.Println("Error: Cannot marshal the message:", err)
 			}
 			client.writeChannel <- d
 		}
+		sub.mu.RUnlock()
 
 		msg.Ack()
 
 	}
 }
 
-func (b *subscriptionsBroker) UnsubscribeClient(ctx context.Context, c *client, topic string) error {
+func (b *subscriptionsBroker) UnsubscribeClient(ctx context.Context, c *client, topic string) {
 	b.mu.RLock()
 	sub, ok := b.subs[topic]
 	b.mu.RUnlock()
 	if !ok {
 		log.Printf("Error: subscription for topic '%v' does not exists.\n", topic)
-		return nil
+		return
 	}
 
 	sub.mu.Lock()
@@ -160,26 +188,7 @@ func (b *subscriptionsBroker) UnsubscribeClient(ctx context.Context, c *client, 
 	c.mu.Unlock()
 
 	sub.mu.RLock()
-	totalSubs := len(sub.clients)
+	log.Printf("Removed subscriber  from topic '%v', total subscribers: %v\n", topic, len(sub.clients))
 	sub.mu.RUnlock()
 
-	log.Printf("Removed subscriber  from topic '%v', total subscribers: %v\n", topic, totalSubs)
-
-	// If there are no clients subscribed to the topic, then shutdown the subscription.
-	if totalSubs == 0 {
-		log.Printf("No subscribers for topic '%v', shuting down subscription of topic.\n", topic)
-		sub.mu.RLock()
-		err := sub.subscription.Shutdown(ctx)
-		sub.mu.RUnlock()
-		if err != nil {
-			if err != context.Canceled {
-				return err
-			}
-		}
-		b.mu.Lock()
-		delete(b.subs, topic)
-		b.mu.Unlock()
-	}
-
-	return nil
 }

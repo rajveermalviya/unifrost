@@ -63,7 +63,7 @@ func (b *EventStreamBroker) EventStreamHandler(w http.ResponseWriter, r *http.Re
 	// Create a new client
 	client := &client{
 		sessID:       uuid.New().String(),
-		writeChannel: make(chan []byte),
+		writeChannel: make(chan []byte, 10),
 		topics:       make(map[string]bool),
 	}
 
@@ -72,10 +72,8 @@ func (b *EventStreamBroker) EventStreamHandler(w http.ResponseWriter, r *http.Re
 	b.mu.Unlock()
 
 	b.mu.RLock()
-	totalClients := len(b.clients)
+	log.Printf("New client with sessID '%v', total clients: %v \n", client.sessID, len(b.clients))
 	b.mu.RUnlock()
-
-	log.Printf("New client with sessID '%v', total clients: %v \n", client.sessID, totalClients)
 
 	// Write the session ID as the first message for using with 'UpdateSubscriptionsHandler'
 	d, _ := json.Marshal(map[string]interface{}{"topic": "/httpsub/config", "payload": map[string]string{"session_id": client.sessID}})
@@ -94,32 +92,33 @@ func (b *EventStreamBroker) EventStreamHandler(w http.ResponseWriter, r *http.Re
 					"message": fmt.Sprintf("Cannot subscribe to topic %v", topic),
 				},
 			})
-			client.writeChannel <- d
+			fmt.Fprintf(w, "data: %s\n\n", d)
+			flusher.Flush()
 		}
 	}
 
 	go func() {
 		<-ctx.Done()
 
-		client.mu.RLock()
-		topics := client.topics
-		client.mu.RUnlock()
+		var wg sync.WaitGroup
 
-		for topic := range topics {
-			if err := b.subscriptionBroker.UnsubscribeClient(ctx, client, topic); err != nil {
-				log.Println(err)
-			}
+		for topic := range client.topics {
+			wg.Add(1)
+			go func(t string) {
+				b.subscriptionBroker.UnsubscribeClient(ctx, client, t)
+				wg.Done()
+			}(topic)
 		}
+
+		wg.Wait()
 
 		b.mu.Lock()
 		delete(b.clients, client.sessID)
 		b.mu.Unlock()
 
 		b.mu.RLock()
-		totalClients := len(b.clients)
+		log.Printf("Client removed '%v', total clients: %v \n", client.sessID, len(b.clients))
 		b.mu.RUnlock()
-
-		log.Printf("Client removed '%v', total clients: %v \n", client.sessID, totalClients)
 	}()
 
 	for {
@@ -175,31 +174,39 @@ func (b *EventStreamBroker) UpdateSubscriptionsHandler(w http.ResponseWriter, r 
 
 	ctx := r.Context()
 
-	for _, topic := range reqData.Add {
-		if err := b.subscriptionBroker.SubscribeClient(client, topic); err != nil {
-			log.Println("Error:", err)
+	var wg sync.WaitGroup
 
-			d, _ := json.Marshal(map[string]interface{}{
-				"error": map[string]string{
-					"code":    "subscription-failure",
-					"message": fmt.Sprintf("Cannot subscribe to topic %v", topic),
-				},
-			})
-			client.writeChannel <- d
-		}
+	for _, topic := range reqData.Add {
+		wg.Add(1)
+		go func(t string) {
+			if err := b.subscriptionBroker.SubscribeClient(client, t); err != nil {
+				log.Println("Error:", err)
+
+				d, _ := json.Marshal(map[string]interface{}{
+					"error": map[string]string{
+						"code":    "subscription-failure",
+						"message": fmt.Sprintf("Cannot subscribe to topic %v", t),
+					},
+				})
+				client.writeChannel <- d
+			}
+			wg.Done()
+		}(topic)
 	}
 
 	for _, topic := range reqData.Remove {
-		if err := b.subscriptionBroker.UnsubscribeClient(ctx, client, topic); err != nil {
-			log.Println("Error:", err)
-		}
+		wg.Add(1)
+		go func(t string) {
+			b.subscriptionBroker.UnsubscribeClient(ctx, client, t)
+			wg.Done()
+		}(topic)
 	}
 
-	client.mu.RLock()
-	totalTopics := len(client.topics)
-	client.mu.RUnlock()
+	wg.Wait()
 
-	log.Printf("Client '%v' subscriptions updated, total topics subscribed: %v \n", client.sessID, totalTopics)
+	client.mu.RLock()
+	log.Printf("Client '%v' subscriptions updated, total topics subscribed: %v \n", client.sessID, len(client.topics))
+	client.mu.RUnlock()
 
 	// Return the ID of the client.
 	enc := json.NewEncoder(w)
