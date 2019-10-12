@@ -14,11 +14,12 @@ import (
 	"github.com/rajveermalviya/gochan"
 	"github.com/rajveermalviya/gochan/drivers"
 	"gocloud.dev/pubsub"
+	_ "gocloud.dev/pubsub/mempubsub"
 )
 
 var (
-	numTopics int = 10
-	interval  int = 5000
+	numTopics int           = 1000
+	interval  time.Duration = time.Second
 )
 
 func main() {
@@ -32,7 +33,8 @@ func main() {
 	}
 
 	if len(os.Args) > 2 {
-		interval, _ = strconv.Atoi(os.Args[2])
+		i, _ := strconv.Atoi(os.Args[2])
+		interval = time.Duration(i)
 	}
 
 	streamer, err := gochan.NewStreamer(ctx, &gochan.ConfigStreamer{
@@ -44,16 +46,19 @@ func main() {
 		log.Fatalln("Error while starting streamer: ", err)
 	}
 
-	client, err := streamer.NewCustomClient(ctx, "custom_client")
-	if err != nil {
-		log.Fatalln("Error while creating new client: ", err)
-	}
-
-	log.Println("New client: ", client.ID)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/update_subscriptions", UpdateSubscriptions(streamer))
-	mux.Handle("/events", streamer)
+	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+		// Auto generate new client id, when new client connects.
+		q := r.URL.Query()
+		if q.Get("id") == "" {
+			client, _ := streamer.NewClient(ctx)
+			q.Set("id", client.ID)
+			r.URL.RawQuery = q.Encode()
+		}
+
+		streamer.ServeHTTP(w, r)
+	})
 
 	go func() {
 		var topics = make([]*pubsub.Topic, numTopics)
@@ -67,7 +72,7 @@ func main() {
 		}
 
 		log.Printf("Opened %v topics\n", numTopics)
-		log.Printf("Sending message every %vms\n", interval)
+		log.Printf("Sending message every %vs\n", interval.Seconds())
 
 		for {
 			log.Println("Sending message")
@@ -86,7 +91,7 @@ func main() {
 					wg.Done()
 				}(j)
 			}
-			time.Sleep(time.Millisecond * time.Duration(interval))
+			time.Sleep(time.Millisecond * interval)
 			wg.Wait()
 		}
 	}()

@@ -62,6 +62,12 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Set("access-control-allow-origin", "*")
 	h.Set("server", "gochan")
 
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
+		return
+	}
+
 	clientID := r.URL.Query().Get("id")
 	if len(clientID) == 0 {
 		http.Error(w, "", http.StatusBadRequest)
@@ -70,7 +76,7 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	streamer.mu.RLock()
 	client := streamer.clients[clientID]
-	streamer.mu.RLock()
+	streamer.mu.RUnlock()
 
 	client.mu.RLock()
 	client.timer.Stop()
@@ -78,14 +84,36 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Client %s connected", clientID)
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
-		return
-	}
+	d, _ := json.Marshal(
+		map[string]interface{}{
+			"topic": "/system/config",
+			"payload": map[string]interface{}{
+				"config": map[string]interface{}{
+					"client_id":             clientID,
+					"client_timeout_millis": streamer.clientTimeout.Milliseconds(),
+				},
+			},
+		},
+	)
+
+	fmt.Fprintf(w, "data: %s\n\n", d)
+	flusher.Flush()
+
+	ctx := r.Context()
+
+	d, _ = json.Marshal(
+		map[string]interface{}{
+			"topic": "/system/subscriptions",
+			"payload": map[string]interface{}{
+				"subscriptions": client.Topics(ctx),
+			},
+		},
+	)
+
+	fmt.Fprintf(w, "data: %s\n\n", d)
+	flusher.Flush()
 
 	go func() {
-		ctx := r.Context()
 		<-ctx.Done()
 
 		log.Printf("Client %s disconnected", clientID)
@@ -158,12 +186,11 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 				break
 			}
 
-			d, err := json.Marshal(map[string]string{"topic": topic, "payload": string(msg.Body)})
+			d, _ := json.Marshal(map[string]string{"topic": topic, "payload": string(msg.Body)})
 
 			client.writeChannel <- d
 			msg.Ack()
 		}
-
 	}()
 
 	return nil

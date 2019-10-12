@@ -1,6 +1,7 @@
 # Gochan: A little package that can stream events to the web
 
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frajveermalviya%2Fgochan.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Frajveermalviya%2Fgochan?ref=badge_shield)
+[![GoDoc](https://godoc.org/github.com/rajveermalviya/gochan?status.svg)](https://godoc.org/github.com/rajveermalviya/gochan)
 
 ⚠ This project is on early stage, it's not ready for production yet ⚠
 
@@ -32,6 +33,56 @@ go get github.com/rajveermalviya/gochan
 For documentation check [godoc](https://godoc.org/github.com/rajveermalviya/gochan).
 
 ## Usage
+
+Gochan uses Server-Sent-Events, because of this it doesn't require to run a standalone server unlike websockets it can be embedded in your api server.
+Gochan's streamer has a ServeHTTP method i.e it implements http.Handler interface and can be used directly or can be wrapped with Auth middleware easily.
+
+```go
+// Using streamer directly
+streamer, err := gochan.NewStreamer(ctx, &gochan.ConfigStreamer{
+	Driver:       drivers.DriverMem,
+	DriverConfig: &drivers.ConfigMem{},
+})
+
+log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:3000", streamer))
+```
+
+```go
+// Using streamer by wrapping it in auth middleware
+streamer, err := gochan.NewStreamer(ctx, &gochan.ConfigStreamer{
+	Driver:       drivers.DriverMem,
+	DriverConfig: &drivers.ConfigMem{},
+})
+
+mux := http.NewServeMux()
+mux.HandleFunc("/events", func (w http.ResponseWriter, r *http.Request) {
+    err := Auth(w,r)
+    if err != nil {
+        return
+    }
+    streamer.ServeHTTP(w,r)
+})
+log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:3000", mux))
+```
+
+When client connects to the server it will send two system messages upfront 1. Configuration and 2. Subscriptions associated with the specified client id.
+New client is created explicitly using the 'streamer.NewClient' method for client with auto generated id. Or 'streamer.NewCustomClient' method for client with specified id.
+
+To generate a new client id every time a client connects use the following middleware with the streamer
+
+```go
+mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+    // Auto generate new client id, when new client connects.
+    q := r.URL.Query()
+    if q.Get("id") == "" {
+        client, _ := streamer.NewClient(ctx)
+        q.Set("id", client.ID)
+        r.URL.RawQuery = q.Encode()
+    }
+
+    streamer.ServeHTTP(w, r)
+})
+```
 
 Check out the [example](examples/1000topics)
 
