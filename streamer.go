@@ -3,6 +3,7 @@ package gochan
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +16,8 @@ import (
 	"gocloud.dev/pubsub"
 )
 
+// Streamer is a top-level struct that will handle all the clients and subscriptions.
+// It implements the http.Handler interface for easy working with the server.
 type Streamer struct {
 	subClient     drivers.SubscriberClient
 	mu            sync.RWMutex
@@ -22,16 +25,25 @@ type Streamer struct {
 	clientTimeout time.Duration
 }
 
+// ConfigStreamer struct is used to configure the Streamer.
 type ConfigStreamer struct {
+	// ClientTimeout is the timeout duration to wait after cleaning the resources
+	// of a disconnected client.
+	// Default is a Minute.
 	ClientTimeout time.Duration
-	DriverConfig  interface{}
-	Driver        drivers.Driver
+	// DriverConfig is config related to the specified driver
+	// See drivers package for more information.
+	DriverConfig interface{}
+	// Driver is the pubsub vendor driver to use.
+	Driver drivers.Driver
 }
 
 var (
-	ErrNoClient = fmt.Errorf("Client doesn't exists")
+	// ErrNoClient is returned if the client-id is not registered in the streamer.
+	ErrNoClient = errors.New("streamer: Client doesn't exists")
 )
 
+// NewStreamer is the construtor for Streamer struct
 func NewStreamer(ctx context.Context, c *ConfigStreamer) (*Streamer, error) {
 	subClient, err := drivers.NewSubscriberClient(ctx, c.Driver, c.DriverConfig)
 	if err != nil {
@@ -42,17 +54,15 @@ func NewStreamer(ctx context.Context, c *ConfigStreamer) (*Streamer, error) {
 		c.ClientTimeout = time.Minute
 	}
 
-	log.Println("Starting new streamer\n Config:", c)
-
-	streamer := &Streamer{
+	return &Streamer{
 		subClient:     subClient,
 		clients:       make(map[string]*Client),
 		clientTimeout: c.ClientTimeout,
-	}
-
-	return streamer, nil
+	}, nil
 }
 
+// ServeHTTP is the http handler for eventsource.
+// For connecting query parameter 'id' is required i.e client-id.
 func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Make request SSE compatible.
 	h := w.Header()
@@ -74,9 +84,13 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	streamer.mu.RLock()
-	client := streamer.clients[clientID]
-	streamer.mu.RUnlock()
+	ctx := r.Context()
+
+	client := streamer.GetClient(ctx, clientID)
+	if client == nil {
+		http.Error(w, "Invalid client ID", http.StatusBadRequest)
+		return
+	}
 
 	client.mu.RLock()
 	client.timer.Stop()
@@ -95,21 +109,17 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 	)
-
 	fmt.Fprintf(w, "data: %s\n\n", d)
 	flusher.Flush()
-
-	ctx := r.Context()
 
 	d, _ = json.Marshal(
 		map[string]interface{}{
 			"topic": "/system/subscriptions",
 			"payload": map[string]interface{}{
-				"subscriptions": client.Topics(ctx),
+				"subscriptions": client.GetTopics(ctx),
 			},
 		},
 	)
-
 	fmt.Fprintf(w, "data: %s\n\n", d)
 	flusher.Flush()
 
@@ -130,27 +140,27 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	for data := range client.writeChannel {
-		streamer.mu.RLock()
-		if _, ok := streamer.clients[clientID]; !ok {
-			streamer.mu.RUnlock()
+		client := streamer.GetClient(ctx, clientID)
+		// If client is nil then client is closed.
+		if client == nil {
+			flusher.Flush()
 			return
 		}
-		streamer.mu.RUnlock()
 
 		fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush()
 	}
 }
 
+// Subscribe method subscribes the specified client to the specified topic.
+// If specified client doesn't exists ErrNoClient error is returned.
 func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic string) error {
-	streamer.mu.RLock()
-	client, ok := streamer.clients[clientID]
-	streamer.mu.RUnlock()
-	if !ok {
+	client := streamer.GetClient(ctx, clientID)
+	if client == nil {
 		return ErrNoClient
 	}
 
-	_, ok = client.topics[topic]
+	_, ok := client.topics[topic]
 	if ok {
 		return nil
 	}
@@ -196,27 +206,30 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 	return nil
 }
 
+// Unsubscribe method unsubscribes the specified client to the specified topic
+// and shutdowns the subscription.
+// If specified client doesn't exists ErrNoClient error is returned.
 func (streamer *Streamer) Unsubscribe(ctx context.Context, clientID string, topic string) error {
-	streamer.mu.RLock()
-	client, ok := streamer.clients[clientID]
-	streamer.mu.RUnlock()
-	if !ok {
+	client := streamer.GetClient(ctx, clientID)
+	if client == nil {
 		return ErrNoClient
 	}
 
-	client.mu.RLock()
-	defer client.mu.RUnlock()
+	client.mu.Lock()
+	defer client.mu.Unlock()
 
-	_, ok = client.topics[topic]
+	sub, ok := client.topics[topic]
 	if !ok {
 		return nil
 	}
 
-	defer log.Printf("Client %s unsubscribed for topic %s", clientID, topic)
+	delete(client.topics, topic)
 
-	return client.topics[topic].Shutdown(ctx)
+	log.Printf("Client %s unsubscribed for topic %s", clientID, topic)
+	return sub.Shutdown(ctx)
 }
 
+// NewClient method creates a new client with an autogenerated client-id.
 func (streamer *Streamer) NewClient(ctx context.Context) (*Client, error) {
 	streamer.mu.Lock()
 	defer streamer.mu.Unlock()
@@ -233,6 +246,7 @@ func (streamer *Streamer) NewClient(ctx context.Context) (*Client, error) {
 	return client, nil
 }
 
+// NewCustomClient method creates a new client with the specified client-id.
 func (streamer *Streamer) NewCustomClient(ctx context.Context, clientID string) (*Client, error) {
 	streamer.mu.Lock()
 	defer streamer.mu.Unlock()
@@ -249,6 +263,7 @@ func (streamer *Streamer) NewCustomClient(ctx context.Context, clientID string) 
 	return client, nil
 }
 
+// GetClient method returns the client instance of the specified clientID.
 func (streamer *Streamer) GetClient(ctx context.Context, clientID string) *Client {
 	streamer.mu.RLock()
 	defer streamer.mu.RUnlock()
@@ -256,6 +271,7 @@ func (streamer *Streamer) GetClient(ctx context.Context, clientID string) *Clien
 	return streamer.clients[clientID]
 }
 
+// TotalClients method returns the number of client connected to the streamer.
 func (streamer *Streamer) TotalClients(ctx context.Context) int {
 	streamer.mu.RLock()
 	defer streamer.mu.RUnlock()
@@ -263,11 +279,10 @@ func (streamer *Streamer) TotalClients(ctx context.Context) int {
 	return len(streamer.clients)
 }
 
+// RemoveClient method removes the client from streamer and closes it.
 func (streamer *Streamer) RemoveClient(ctx context.Context, clientID string) error {
-	streamer.mu.RLock()
-	client, ok := streamer.clients[clientID]
-	streamer.mu.RUnlock()
-	if !ok {
+	client := streamer.GetClient(ctx, clientID)
+	if client == nil {
 		return ErrNoClient
 	}
 
@@ -282,6 +297,15 @@ func (streamer *Streamer) RemoveClient(ctx context.Context, clientID string) err
 	return nil
 }
 
+// Close method closes the streamer and also closes all the connected clients.
 func (streamer *Streamer) Close(ctx context.Context) error {
+	log.Println("Closing streamer")
+	streamer.mu.RLock()
+	defer streamer.mu.RUnlock()
+
+	for _, client := range streamer.clients {
+		go client.Close(ctx)
+	}
+
 	return streamer.subClient.Close(ctx)
 }

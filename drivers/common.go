@@ -7,29 +7,43 @@ import (
 	"gocloud.dev/pubsub"
 )
 
-// SubscriberClient
+// SubscriberClient connects to the specific pubsub vendor using specific drivers,
+// it also hides the specific driver implementation for subscribing to topics
+// And gives a single interface for all driver types.
 type SubscriberClient interface {
-	Close(context.Context) error
+	// Subscribe method subscribes to the specified topic
+	// and returns the gocloud pubsub Subscription
 	Subscribe(context.Context, string) (*pubsub.Subscription, error)
+
+	Close(context.Context) error
 }
 
+// Driver is an enum type for indentifying all the drivers
 type Driver int
 
 const (
+	// DriverMem is an identifier for in-memory driver
 	DriverMem Driver = iota + 1
+	// DriverGCP is an identifier for GCP PubSub driver
 	DriverGCP
+	// DriverRabbit is an identifier for RabbitMQ driver
 	DriverRabbit
+	// DriverNats is an identifier for NATS driver
 	DriverNats
+	// DriverKafka is an identifier for Kafka driver
 	DriverKafka
 	// DriverAWS
 	// DriverAzure
 )
 
 var (
-	ErrInvalidDriver          = errors.New("driver: Invalid driver specified")
+	// ErrInvalidDriver error
+	ErrInvalidDriver = errors.New("driver: Invalid driver specified")
+	// ErrInvalidConfigSignature error
 	ErrInvalidConfigSignature = errors.New("driver: Invalid config signature for specifie driver")
 )
 
+// NewSubscriberClient is a function for creating a specific SubscriberClient instance.
 func NewSubscriberClient(ctx context.Context, driver Driver, config interface{}) (SubscriberClient, error) {
 	switch driver {
 	case DriverGCP:

@@ -9,6 +9,7 @@ import (
 	"gocloud.dev/pubsub"
 )
 
+// Client is a top-level struct that manages all the topics.
 type Client struct {
 	ID           string
 	writeChannel chan []byte
@@ -17,7 +18,8 @@ type Client struct {
 	timer        *time.Timer
 }
 
-func (client *Client) Topics(ctx context.Context) []string {
+// GetTopics method returns an array of all the topics client is subscribed to.
+func (client *Client) GetTopics(ctx context.Context) []string {
 	client.mu.RLock()
 	defer client.mu.RUnlock()
 
@@ -29,12 +31,14 @@ func (client *Client) Topics(ctx context.Context) []string {
 	return keys
 }
 
+// TotalTopics method returns the number of topics the client is subscribed to.
 func (client *Client) TotalTopics(ctx context.Context) int {
 	client.mu.RLock()
 	defer client.mu.RUnlock()
 	return len(client.topics)
 }
 
+// Close method closes the client and shutdowns all the subscriptions.
 func (client *Client) Close(ctx context.Context) error {
 	client.mu.Lock()
 	defer client.mu.Unlock()
@@ -48,7 +52,7 @@ func (client *Client) Close(ctx context.Context) error {
 		delete(client.topics, key)
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
 	close(client.writeChannel)
 	return nil

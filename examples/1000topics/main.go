@@ -41,6 +41,10 @@ func main() {
 		Driver:       drivers.DriverMem,
 		DriverConfig: &drivers.ConfigMem{},
 	})
+	defer streamer.Close(ctx)
+
+	c, _ := streamer.NewCustomClient(ctx, "custom_client")
+	log.Println("New client created:", c.ID)
 
 	if err != nil {
 		log.Fatalln("Error while starting streamer: ", err)
@@ -52,8 +56,8 @@ func main() {
 		// Auto generate new client id, when new client connects.
 		q := r.URL.Query()
 		if q.Get("id") == "" {
-			client, _ := streamer.NewClient(ctx)
-			q.Set("id", client.ID)
+			c, _ := streamer.NewClient(ctx)
+			q.Set("id", c.ID)
 			r.URL.RawQuery = q.Encode()
 		}
 
@@ -91,7 +95,7 @@ func main() {
 					wg.Done()
 				}(j)
 			}
-			time.Sleep(time.Millisecond * interval)
+			time.Sleep(interval)
 			wg.Wait()
 		}
 	}()
