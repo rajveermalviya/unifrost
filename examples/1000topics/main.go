@@ -51,7 +51,7 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/update_subscriptions", UpdateSubscriptions(streamer))
+	mux.HandleFunc("/update_subscriptions", updateSubscriptions(streamer))
 	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
 		// Auto generate new client id, when new client connects.
 		q := r.URL.Query()
@@ -105,7 +105,7 @@ func main() {
 	log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:3000", mux))
 }
 
-func UpdateSubscriptions(streamer *gochan.Streamer) http.HandlerFunc {
+func updateSubscriptions(streamer *gochan.Streamer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method != "POST" {

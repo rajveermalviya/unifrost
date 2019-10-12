@@ -2,6 +2,7 @@
 
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frajveermalviya%2Fgochan.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Frajveermalviya%2Fgochan?ref=badge_shield)
 [![GoDoc](https://godoc.org/github.com/rajveermalviya/gochan?status.svg)](https://godoc.org/github.com/rajveermalviya/gochan)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rajveermalviya/gochan)](https://goreportcard.com/report/rajveermalviya/gochan)
 
 ⚠ This project is on early stage, it's not ready for production yet ⚠
 
