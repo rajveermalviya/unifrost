@@ -178,7 +178,7 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 
 	go func() {
 		ctx := context.Background()
-		defer log.Printf("Client %s stopped recieving messages for topic %s", clientID, topic)
+		defer log.Printf("Client %s stopped receiving messages for topic %s", clientID, topic)
 
 		for {
 			msg, err := sub.Receive(ctx)
@@ -187,7 +187,7 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 					break
 				}
 
-				log.Println("Error: Cannot recieve message:", err)
+				log.Println("Error: Cannot receive message:", err)
 
 				sub.Shutdown(ctx)
 				client.mu.Lock()
