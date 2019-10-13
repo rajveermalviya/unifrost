@@ -78,7 +78,7 @@ When client connects to the server it will send two system messages upfront,
    topic prefixed with '/system'.
 
 New client is created explicitly using the `streamer.NewClient()` for
-client with auto generated id. Or `streamer.NewCustomClient()` for client
+client with auto generated id or `streamer.NewCustomClient()` for client
 with specified id.
 
 This makes it easy to integrate authentication to the streamer, just create
@@ -134,9 +134,10 @@ more improvements.
 
 ## Future Goals:
 
-- Support additional pusub vendors by contributing back to [Go CDK](https://gocloud.dev)
 - Standalone server that can be configured by yaml, while also staying modular.
-- Become a [CNCF](https://cncf.io) project (...maybe)
+- Making it horizontally scalabe using Redis as state backend.
+- Creating a website for documentation & overview, and some examples.
+- Become a [CNCF](https://cncf.io) project (...maybe).
 
 ## Users
 

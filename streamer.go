@@ -50,6 +50,7 @@ func NewStreamer(ctx context.Context, c *ConfigStreamer) (*Streamer, error) {
 		return nil, err
 	}
 
+	// default to a minute of client timeout
 	if c.ClientTimeout == time.Duration(0) {
 		c.ClientTimeout = time.Minute
 	}
@@ -92,12 +93,15 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Stop the timeout timer if it is running.
 	client.mu.RLock()
 	client.timer.Stop()
 	client.mu.RUnlock()
 
 	log.Printf("Client %s connected", clientID)
 
+	// First message:
+	// client_id & client_timeout_millis
 	d, _ := json.Marshal(
 		map[string]interface{}{
 			"topic": "/system/config",
@@ -112,6 +116,8 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "data: %s\n\n", d)
 	flusher.Flush()
 
+	// Second Message:
+	// All the subscriptions the client has subscribed to.
 	d, _ = json.Marshal(
 		map[string]interface{}{
 			"topic": "/system/subscriptions",
@@ -128,6 +134,7 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		log.Printf("Client %s disconnected", clientID)
 
+		// When client gets disconnected start the timer
 		timer := time.NewTimer(streamer.clientTimeout)
 
 		client.mu.Lock()
@@ -136,13 +143,15 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		<-timer.C // FIXME: (goroutine stays running) (#need-help)
 		log.Printf("Disconnected client %s timed out, cleaning...", clientID)
+
+		// cleanup the resources if the timer is expired
 		streamer.RemoveClient(context.Background(), clientID)
 	}()
 
 	for data := range client.writeChannel {
 		client := streamer.GetClient(ctx, clientID)
-		// If client is nil then client is closed.
 		if client == nil {
+			// If client is nil then client is closed and so complete the request.
 			flusher.Flush()
 			return
 		}
@@ -160,11 +169,14 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 		return ErrNoClient
 	}
 
+	client.mu.RLock()
 	_, ok := client.topics[topic]
+	client.mu.RUnlock()
 	if ok {
 		return nil
 	}
 
+	// subscribe to the specified topic
 	sub, err := streamer.subClient.Subscribe(ctx, topic)
 	if err != nil {
 		return err
@@ -184,12 +196,17 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 			msg, err := sub.Receive(ctx)
 			if err != nil {
 				if gcerrors.Code(err) == gcerrors.FailedPrecondition {
+					// if the error is FailedPrecondition it means that the subscription
+					// is shutdown so break the loop and exit the goroutine.
 					break
 				}
 
+				// if error is unknown then shutdown the subscription and
+				// remove the subscription from the client
 				log.Println("Error: Cannot receive message:", err)
 
 				sub.Shutdown(ctx)
+
 				client.mu.Lock()
 				delete(client.topics, topic)
 				client.mu.Unlock()
@@ -215,15 +232,16 @@ func (streamer *Streamer) Unsubscribe(ctx context.Context, clientID string, topi
 		return ErrNoClient
 	}
 
-	client.mu.Lock()
-	defer client.mu.Unlock()
-
+	client.mu.RLock()
 	sub, ok := client.topics[topic]
+	client.mu.RUnlock()
 	if !ok {
 		return nil
 	}
 
+	client.mu.Lock()
 	delete(client.topics, topic)
+	client.mu.Unlock()
 
 	log.Printf("Client %s unsubscribed for topic %s", clientID, topic)
 	return sub.Shutdown(ctx)
@@ -303,6 +321,7 @@ func (streamer *Streamer) Close(ctx context.Context) error {
 	streamer.mu.RLock()
 	defer streamer.mu.RUnlock()
 
+	// loop over all the client and close all the clients
 	for _, client := range streamer.clients {
 		go client.Close(ctx)
 	}

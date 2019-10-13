@@ -45,6 +45,7 @@ func (client *Client) Close(ctx context.Context) error {
 
 	log.Printf("Closing client %s", client.ID)
 
+	// loop over all the topics and shut them down
 	for key, topic := range client.topics {
 		if err := topic.Shutdown(ctx); err != nil {
 			log.Println("streamer: ", err)
