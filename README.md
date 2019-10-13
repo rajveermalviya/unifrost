@@ -72,7 +72,7 @@ log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:3000", mux))
 
 When client connects to the server it will send two system messages upfront,
 
-1. Configuration: it contains the client-id and client-timeout set by the
+1. Configuration: it contains the client-id and client-ttl set by the
    streamer config
 2. Subscriptions associated with the specified client id. These messages have
    topic prefixed with '/system'.
@@ -90,7 +90,7 @@ use the following middleware with the streamer.
 
 ```go
 mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
-    // Auto generate new client id, when new client connects.
+    // Auto generate new clientID, when new client connects.
     q := r.URL.Query()
     if q.Get("id") == "" {
         client, _ := streamer.NewClient(ctx)
@@ -103,8 +103,8 @@ mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
 ```
 
 When a client gets disconnected it has a time window to connect to the server
-again with the state unchanged. If client timeout is not specified in the
-streamer config then default timeout of one minute is set.
+again with the state unchanged. If client ttl is not specified in the
+streamer config then default ttl is set to one.
 
 To know more, check out the [example](examples/1000topics)
 

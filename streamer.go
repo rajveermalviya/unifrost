@@ -19,18 +19,18 @@ import (
 // Streamer is a top-level struct that will handle all the clients and subscriptions.
 // It implements the http.Handler interface for easy working with the server.
 type Streamer struct {
-	subClient     drivers.SubscriberClient
-	mu            sync.RWMutex
-	clients       map[string]*Client
-	clientTimeout time.Duration
+	subClient drivers.SubscriberClient
+	mu        sync.RWMutex
+	clients   map[string]*Client
+	clientTTL time.Duration
 }
 
 // ConfigStreamer struct is used to configure the Streamer.
 type ConfigStreamer struct {
-	// ClientTimeout is the timeout duration to wait after cleaning the resources
+	// ClientTTL is the time-to-live duration to wait after cleaning the resources
 	// of a disconnected client.
 	// Default is a Minute.
-	ClientTimeout time.Duration
+	ClientTTL time.Duration
 	// DriverConfig is config related to the specified driver
 	// See drivers package for more information.
 	DriverConfig interface{}
@@ -50,15 +50,15 @@ func NewStreamer(ctx context.Context, c *ConfigStreamer) (*Streamer, error) {
 		return nil, err
 	}
 
-	// default to a minute of client timeout
-	if c.ClientTimeout == time.Duration(0) {
-		c.ClientTimeout = time.Minute
+	// default to a minute of client cleanup timeout
+	if c.ClientTTL == time.Duration(0) {
+		c.ClientTTL = time.Minute
 	}
 
 	return &Streamer{
-		subClient:     subClient,
-		clients:       make(map[string]*Client),
-		clientTimeout: c.ClientTimeout,
+		subClient: subClient,
+		clients:   make(map[string]*Client),
+		clientTTL: c.ClientTTL,
 	}, nil
 }
 
@@ -95,20 +95,20 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Stop the timeout timer if it is running.
 	client.mu.RLock()
-	client.timer.Stop()
+	client.ttlTimer.Stop()
 	client.mu.RUnlock()
 
 	log.Printf("Client %s connected", clientID)
 
 	// First message:
-	// client_id & client_timeout_millis
+	// client_id & client_ttl_millis
 	d, _ := json.Marshal(
 		map[string]interface{}{
 			"topic": "/system/config",
 			"payload": map[string]interface{}{
 				"config": map[string]interface{}{
-					"client_id":             clientID,
-					"client_timeout_millis": streamer.clientTimeout.Milliseconds(),
+					"client_id":         clientID,
+					"client_ttl_millis": streamer.clientTTL.Milliseconds(),
 				},
 			},
 		},
@@ -135,10 +135,10 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Client %s disconnected", clientID)
 
 		// When client gets disconnected start the timer
-		timer := time.NewTimer(streamer.clientTimeout)
+		timer := time.NewTimer(streamer.clientTTL)
 
 		client.mu.Lock()
-		client.timer = timer
+		client.ttlTimer = timer
 		client.mu.Unlock()
 
 		<-timer.C // FIXME: (goroutine stays running) (#need-help)
@@ -256,7 +256,7 @@ func (streamer *Streamer) NewClient(ctx context.Context) (*Client, error) {
 		ID:           uuid.New().String(),
 		writeChannel: make(chan []byte, 10),
 		topics:       make(map[string]*pubsub.Subscription),
-		timer:        time.NewTimer(streamer.clientTimeout),
+		ttlTimer:     time.NewTimer(streamer.clientTTL),
 	}
 
 	streamer.clients[client.ID] = client
@@ -264,7 +264,7 @@ func (streamer *Streamer) NewClient(ctx context.Context) (*Client, error) {
 	return client, nil
 }
 
-// NewCustomClient method creates a new client with the specified client-id.
+// NewCustomClient method creates a new client with the specified clientID.
 func (streamer *Streamer) NewCustomClient(ctx context.Context, clientID string) (*Client, error) {
 	streamer.mu.Lock()
 	defer streamer.mu.Unlock()
@@ -273,7 +273,7 @@ func (streamer *Streamer) NewCustomClient(ctx context.Context, clientID string) 
 		ID:           clientID,
 		writeChannel: make(chan []byte, 10),
 		topics:       make(map[string]*pubsub.Subscription),
-		timer:        time.NewTimer(streamer.clientTimeout),
+		ttlTimer:     time.NewTimer(streamer.clientTTL),
 	}
 
 	streamer.clients[client.ID] = client
@@ -325,6 +325,8 @@ func (streamer *Streamer) Close(ctx context.Context) error {
 	for _, client := range streamer.clients {
 		go client.Close(ctx)
 	}
+
+	defer time.Sleep(2 * time.Second)
 
 	return streamer.subClient.Close(ctx)
 }

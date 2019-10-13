@@ -15,7 +15,7 @@ type Client struct {
 	writeChannel chan []byte
 	topics       map[string]*pubsub.Subscription
 	mu           sync.RWMutex
-	timer        *time.Timer
+	ttlTimer     *time.Timer
 }
 
 // GetTopics method returns an array of all the topics client is subscribed to.

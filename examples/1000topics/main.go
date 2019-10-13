@@ -7,8 +7,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/rajveermalviya/gochan"
@@ -23,26 +25,40 @@ var (
 )
 
 func main() {
-
 	log.SetFlags(log.Lshortfile)
 
 	ctx := context.Background()
 
-	if len(os.Args) > 1 {
-		numTopics, _ = strconv.Atoi(os.Args[1])
-	}
+	// if len(os.Args) > 1 {
+	// 	numTopics, _ = strconv.Atoi(os.Args[1])
+	// }
 
-	if len(os.Args) > 2 {
-		i, _ := strconv.Atoi(os.Args[2])
-		interval = time.Duration(i)
-	}
+	// if len(os.Args) > 2 {
+	// 	i, _ := strconv.Atoi(os.Args[2])
+	// 	interval = time.Duration(i)
+	// }
 
 	streamer, err := gochan.NewStreamer(ctx, &gochan.ConfigStreamer{
 		Driver:       drivers.DriverMem,
 		DriverConfig: &drivers.ConfigMem{},
 	})
-	defer streamer.Close(ctx)
 
+	// add a signal notifier to close the streamer gracefully
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Println("sig:", <-sigs)
+		log.Println("Gracefully closing the server")
+
+		if err := streamer.Close(ctx); err != nil {
+			log.Printf("Error occured while closing the streamer: %v : closing forcefully", err)
+		}
+
+		os.Exit(0)
+	}()
+
+	// create a new custom_client for testing
 	c, _ := streamer.NewCustomClient(ctx, "custom_client")
 	log.Println("New client created:", c.ID)
 
