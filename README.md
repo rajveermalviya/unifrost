@@ -70,8 +70,9 @@ mux.HandleFunc("/events", func (w http.ResponseWriter, r *http.Request) {
 log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:3000", mux))
 ```
 
-When client connects to the server it will send a message that will contain two
-things the configuration and client subscriptions message upfront,
+When client connects to the server it will send a message that will contain
+two things the configuration and an array of all the topics to which the client
+has subscribed.
 
 1. Configuration: it contains the client-id and client-ttl set by the
    streamer config
@@ -102,7 +103,8 @@ Example error messaage:
 ```
 
 All the info events are streamed over message channel i.e using the
-EventSource JS API, `onmessage` method will listen to them.
+EventSource JS API, `onmessage` or `addEventListener('message', () => {})`
+method will listen to them.
 All the subscription events have event name same as their topic name, so to
 listen to topic events you need to add an event-listener on the EventSource
 object.
@@ -112,17 +114,17 @@ Client example:
 ```js
 const sse = new EventSource('/events?id=9ba6f4e1-8f80-4e61-944e-e3f409ae514f');
 // for info events like first-message and errors
-sse.onmessage = e => {
+sse.addEventListener('message', e => {
   console.log(e);
-};
+});
 
 // for subscription events
-sse.addEventlistener('topic10', e => {
+sse.addEventListener('topic10', e => {
   console.log(e);
 });
 ```
 
-_Note: You can only listen to subscription events by adding an eventlistener._
+**Note:** _The only way to listen to subscription events is by adding an eventlistener to that specific topic. `onmessage` method will only listen to info messages._
 
 New client is created explicitly using the `streamer.NewClient()` for
 client with auto generated id or `streamer.NewCustomClient()` for client
@@ -182,7 +184,7 @@ more improvements.
 ## Future Goals:
 
 - Standalone server that can be configured by yaml, while also staying modular.
-- Making it horizontally scalabe using Redis as state backend.
+- Making it horizontally scalabe using [raft](https://raft.github.io/) consensus algorithm.
 - Creating a website for documentation & overview, and some examples.
 - Become a [CNCF](https://cncf.io) project (...maybe).
 
