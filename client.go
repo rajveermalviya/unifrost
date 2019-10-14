@@ -19,7 +19,7 @@ type Client struct {
 }
 
 type message struct {
-	topic   string
+	event   string
 	payload []byte
 }
 

@@ -88,17 +88,14 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	client := streamer.GetClient(ctx, clientID)
 	if client == nil {
-		http.Error(w, "Invalid client ID", http.StatusBadRequest)
+		http.Error(w, "Invalid client ID", http.StatusUnauthorized)
 		return
 	}
 
 	// Stop the timeout timer if it is running.
 	client.mu.RLock()
-	t := client.ttlTimer
+	client.ttlTimer.Stop()
 	client.mu.RUnlock()
-	if !t.Stop() {
-		<-t.C
-	}
 
 	log.Printf("Client %s connected", clientID)
 
@@ -110,20 +107,10 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"client_id":         clientID,
 				"client_ttl_millis": streamer.clientTTLMillis,
 			},
-		},
-	)
-	fmt.Fprintf(w, "event: %s\n", "/system/config")
-	fmt.Fprintf(w, "data: %s\n\n", d)
-	flusher.Flush()
-
-	// Second Message:
-	// All the subscriptions the client has subscribed to.
-	d, _ = json.Marshal(
-		map[string][]string{
 			"subscriptions": client.GetTopics(ctx),
 		},
 	)
-	fmt.Fprintf(w, "event: %s\n", "/system/subscriptions")
+	fmt.Fprint(w, "event: message\n")
 	fmt.Fprintf(w, "data: %s\n\n", d)
 	flusher.Flush()
 
@@ -149,15 +136,17 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		client := streamer.GetClient(ctx, clientID)
 		if client == nil {
 			// If client is nil then client is closed and so complete the request.
-			fmt.Fprintf(w, "error: %s\n\n", "Client closed")
-			flusher.Flush()
-			return
+			break
 		}
 
-		fmt.Fprintf(w, "event: %s\n", data.topic)
+		fmt.Fprintf(w, "event: %s\n", data.event)
 		fmt.Fprintf(w, "data: %s\n\n", data.payload)
 		flusher.Flush()
 	}
+
+	fmt.Fprint(w, "event: message\n")
+	fmt.Fprintf(w, "data: %s\n\n", "Client closed")
+	flusher.Flush()
 }
 
 // Subscribe method subscribes the specified client to the specified topic.
@@ -204,12 +193,14 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 				// remove the subscription from the client
 				log.Println("Error: Cannot receive message:", err)
 
-				d, _ := json.Marshal(map[string]string{
-					"topic":   topic,
-					"code":    "subscription-failure",
-					"message": fmt.Sprintf("Cannot recieve message from subscription: %v", topic),
+				d, _ := json.Marshal(map[string]interface{}{
+					"error": map[string]string{
+						"topic":   topic,
+						"code":    "subscription-failure",
+						"message": fmt.Sprint("Cannot recieve message from subscription, closing subscription"),
+					},
 				})
-				client.messageChannel <- message{topic: "/system/error", payload: d}
+				client.messageChannel <- message{event: "message", payload: d}
 
 				sub.Shutdown(ctx)
 
@@ -219,7 +210,7 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 				break
 			}
 
-			client.messageChannel <- message{topic: topic, payload: msg.Body}
+			client.messageChannel <- message{event: topic, payload: msg.Body}
 			msg.Ack()
 		}
 	}()

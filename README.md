@@ -70,12 +70,59 @@ mux.HandleFunc("/events", func (w http.ResponseWriter, r *http.Request) {
 log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:3000", mux))
 ```
 
-When client connects to the server it will send two system messages upfront,
+When client connects to the server it will send a message that will contain two
+things the configuration and client subscriptions message upfront,
 
 1. Configuration: it contains the client-id and client-ttl set by the
    streamer config
-2. Subscriptions associated with the specified client id. These messages have
-   topic prefixed with '/system'.
+2. Subscriptions associated with the specified client id.
+
+Example first message:
+
+```json
+{
+  "config": {
+    "client_id": "9ba6f4e1-8f80-4e61-944e-e3f409ae514f",
+    "client_ttl_millis": 60000
+  },
+  "subscriptions": ["topic5", "topic1", "topic3", "topic4"]
+}
+```
+
+Example error messaage:
+
+```json
+{
+  "error": {
+    "topic": "topic10",
+    "code": "subscription-failure",
+    "message": "Cannot recieve message from subscription, closing subscription"
+  }
+}
+```
+
+All the info events are streamed over message channel i.e using the
+EventSource JS API, `onmessage` method will listen to them.
+All the subscription events have event name same as their topic name, so to
+listen to topic events you need to add an event-listener on the EventSource
+object.
+
+Client example:
+
+```js
+const sse = new EventSource('/events?id=9ba6f4e1-8f80-4e61-944e-e3f409ae514f');
+// for info events like first-message and errors
+sse.onmessage = e => {
+  console.log(e);
+};
+
+// for subscription events
+sse.addEventlistener('topic10', e => {
+  console.log(e);
+});
+```
+
+_Note: You can only listen to subscription events by adding an eventlistener._
 
 New client is created explicitly using the `streamer.NewClient()` for
 client with auto generated id or `streamer.NewCustomClient()` for client
