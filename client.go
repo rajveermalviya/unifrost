@@ -11,11 +11,16 @@ import (
 
 // Client is a top-level struct that manages all the topics.
 type Client struct {
-	ID           string
-	writeChannel chan []byte
-	topics       map[string]*pubsub.Subscription
-	mu           sync.RWMutex
-	ttlTimer     *time.Timer
+	ID             string
+	messageChannel chan message
+	topics         map[string]*pubsub.Subscription
+	mu             sync.RWMutex
+	ttlTimer       *time.Timer
+}
+
+type message struct {
+	topic   string
+	payload []byte
 }
 
 // GetTopics method returns an array of all the topics client is subscribed to.
@@ -45,6 +50,10 @@ func (client *Client) Close(ctx context.Context) error {
 
 	log.Printf("Closing client %s", client.ID)
 
+	if len(client.topics) > 0 {
+		defer time.Sleep(time.Second)
+	}
+
 	// loop over all the topics and shut them down
 	for key, topic := range client.topics {
 		if err := topic.Shutdown(ctx); err != nil {
@@ -53,8 +62,6 @@ func (client *Client) Close(ctx context.Context) error {
 		delete(client.topics, key)
 	}
 
-	time.Sleep(time.Second)
-
-	close(client.writeChannel)
+	close(client.messageChannel)
 	return nil
 }

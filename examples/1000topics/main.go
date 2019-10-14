@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,32 +17,33 @@ import (
 	"github.com/rajveermalviya/gochan"
 	"github.com/rajveermalviya/gochan/drivers"
 	"gocloud.dev/pubsub"
+
+	// required for initializing mempubsub
 	_ "gocloud.dev/pubsub/mempubsub"
 )
 
 var (
-	numTopics int           = 1000
-	interval  time.Duration = time.Second
+	numTopics int
+	interval  time.Duration
 )
 
 func main() {
+	flag.Parse()
+	numTopics = *flag.Int("topics", 1000, "Number of topics")
+	interval = *flag.Duration("interval", time.Second, "Time interval")
+
 	log.SetFlags(log.Lshortfile)
 
 	ctx := context.Background()
-
-	// if len(os.Args) > 1 {
-	// 	numTopics, _ = strconv.Atoi(os.Args[1])
-	// }
-
-	// if len(os.Args) > 2 {
-	// 	i, _ := strconv.Atoi(os.Args[2])
-	// 	interval = time.Duration(i)
-	// }
 
 	streamer, err := gochan.NewStreamer(ctx, &gochan.ConfigStreamer{
 		Driver:       drivers.DriverMem,
 		DriverConfig: &drivers.ConfigMem{},
 	})
+	if err != nil {
+		log.Fatalln("Error while starting streamer: ", err)
+	}
+	defer streamer.Close(ctx)
 
 	// add a signal notifier to close the streamer gracefully
 	sigs := make(chan os.Signal, 1)
@@ -61,10 +63,6 @@ func main() {
 	// create a new custom_client for testing
 	c, _ := streamer.NewCustomClient(ctx, "custom_client")
 	log.Println("New client created:", c.ID)
-
-	if err != nil {
-		log.Fatalln("Error while starting streamer: ", err)
-	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/update_subscriptions", updateSubscriptions(streamer))
@@ -104,7 +102,9 @@ func main() {
 				go func(i int) {
 					eventString := fmt.Sprintf("Topic%v %v", i, time.Now())
 
-					err := topics[i].Send(ctx, &pubsub.Message{Body: []byte(eventString)})
+					d, _ := json.Marshal(map[string]string{"payload": eventString})
+
+					err := topics[i].Send(ctx, &pubsub.Message{Body: d})
 					if err != nil {
 						log.Fatal(err)
 					}

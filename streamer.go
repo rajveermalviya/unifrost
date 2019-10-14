@@ -19,10 +19,10 @@ import (
 // Streamer is a top-level struct that will handle all the clients and subscriptions.
 // It implements the http.Handler interface for easy working with the server.
 type Streamer struct {
-	subClient drivers.SubscriberClient
-	mu        sync.RWMutex
-	clients   map[string]*Client
-	clientTTL time.Duration
+	subClient       drivers.SubscriberClient
+	mu              sync.RWMutex
+	clients         map[string]*Client
+	clientTTLMillis time.Duration
 }
 
 // ConfigStreamer struct is used to configure the Streamer.
@@ -56,9 +56,9 @@ func NewStreamer(ctx context.Context, c *ConfigStreamer) (*Streamer, error) {
 	}
 
 	return &Streamer{
-		subClient: subClient,
-		clients:   make(map[string]*Client),
-		clientTTL: c.ClientTTL,
+		subClient:       subClient,
+		clients:         make(map[string]*Client),
+		clientTTLMillis: time.Duration(c.ClientTTL.Milliseconds()),
 	}, nil
 }
 
@@ -67,11 +67,10 @@ func NewStreamer(ctx context.Context, c *ConfigStreamer) (*Streamer, error) {
 func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Make request SSE compatible.
 	h := w.Header()
-	h.Set("content-type", "text/event-stream")
-	h.Set("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0")
-	h.Set("connection", "keep-alive")
-	h.Set("access-control-allow-origin", "*")
-	h.Set("server", "gochan")
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0")
+	h.Set("Connection", "keep-alive")
+	h.Set("Server", "gochan")
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -95,8 +94,11 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Stop the timeout timer if it is running.
 	client.mu.RLock()
-	client.ttlTimer.Stop()
+	t := client.ttlTimer
 	client.mu.RUnlock()
+	if !t.Stop() {
+		<-t.C
+	}
 
 	log.Printf("Client %s connected", clientID)
 
@@ -104,59 +106,56 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// client_id & client_ttl_millis
 	d, _ := json.Marshal(
 		map[string]interface{}{
-			"topic": "/system/config",
-			"payload": map[string]interface{}{
-				"config": map[string]interface{}{
-					"client_id":         clientID,
-					"client_ttl_millis": streamer.clientTTL.Milliseconds(),
-				},
+			"config": map[string]interface{}{
+				"client_id":         clientID,
+				"client_ttl_millis": streamer.clientTTLMillis,
 			},
 		},
 	)
+	fmt.Fprintf(w, "event: %s\n", "/system/config")
 	fmt.Fprintf(w, "data: %s\n\n", d)
 	flusher.Flush()
 
 	// Second Message:
 	// All the subscriptions the client has subscribed to.
 	d, _ = json.Marshal(
-		map[string]interface{}{
-			"topic": "/system/subscriptions",
-			"payload": map[string]interface{}{
-				"subscriptions": client.GetTopics(ctx),
-			},
+		map[string][]string{
+			"subscriptions": client.GetTopics(ctx),
 		},
 	)
+	fmt.Fprintf(w, "event: %s\n", "/system/subscriptions")
 	fmt.Fprintf(w, "data: %s\n\n", d)
 	flusher.Flush()
 
 	go func() {
 		<-ctx.Done()
-
 		log.Printf("Client %s disconnected", clientID)
 
 		// When client gets disconnected start the timer
-		timer := time.NewTimer(streamer.clientTTL)
+		timer := time.NewTimer(streamer.clientTTLMillis * time.Millisecond)
 
 		client.mu.Lock()
 		client.ttlTimer = timer
 		client.mu.Unlock()
 
-		<-timer.C // FIXME: (goroutine stays running) (#need-help)
-		log.Printf("Disconnected client %s timed out, cleaning...", clientID)
-
 		// cleanup the resources if the timer is expired
-		streamer.RemoveClient(context.Background(), clientID)
+		if _, ok := <-timer.C; ok {
+			log.Printf("Disconnected client %s timed out, cleaning...", clientID)
+			streamer.RemoveClient(context.Background(), clientID)
+		}
 	}()
 
-	for data := range client.writeChannel {
+	for data := range client.messageChannel {
 		client := streamer.GetClient(ctx, clientID)
 		if client == nil {
 			// If client is nil then client is closed and so complete the request.
+			fmt.Fprintf(w, "error: %s\n\n", "Client closed")
 			flusher.Flush()
 			return
 		}
 
-		fmt.Fprintf(w, "data: %s\n\n", data)
+		fmt.Fprintf(w, "event: %s\n", data.topic)
+		fmt.Fprintf(w, "data: %s\n\n", data.payload)
 		flusher.Flush()
 	}
 }
@@ -205,6 +204,13 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 				// remove the subscription from the client
 				log.Println("Error: Cannot receive message:", err)
 
+				d, _ := json.Marshal(map[string]string{
+					"topic":   topic,
+					"code":    "subscription-failure",
+					"message": fmt.Sprintf("Cannot recieve message from subscription: %v", topic),
+				})
+				client.messageChannel <- message{topic: "/system/error", payload: d}
+
 				sub.Shutdown(ctx)
 
 				client.mu.Lock()
@@ -213,9 +219,7 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 				break
 			}
 
-			d, _ := json.Marshal(map[string]string{"topic": topic, "payload": string(msg.Body)})
-
-			client.writeChannel <- d
+			client.messageChannel <- message{topic: topic, payload: msg.Body}
 			msg.Ack()
 		}
 	}()
@@ -253,10 +257,10 @@ func (streamer *Streamer) NewClient(ctx context.Context) (*Client, error) {
 	defer streamer.mu.Unlock()
 
 	client := &Client{
-		ID:           uuid.New().String(),
-		writeChannel: make(chan []byte, 10),
-		topics:       make(map[string]*pubsub.Subscription),
-		ttlTimer:     time.NewTimer(streamer.clientTTL),
+		ID:             uuid.New().String(),
+		messageChannel: make(chan message, 10),
+		topics:         make(map[string]*pubsub.Subscription),
+		ttlTimer:       time.NewTimer(streamer.clientTTLMillis * time.Millisecond),
 	}
 
 	streamer.clients[client.ID] = client
@@ -270,10 +274,10 @@ func (streamer *Streamer) NewCustomClient(ctx context.Context, clientID string) 
 	defer streamer.mu.Unlock()
 
 	client := &Client{
-		ID:           clientID,
-		writeChannel: make(chan []byte, 10),
-		topics:       make(map[string]*pubsub.Subscription),
-		ttlTimer:     time.NewTimer(streamer.clientTTL),
+		ID:             clientID,
+		messageChannel: make(chan message, 10),
+		topics:         make(map[string]*pubsub.Subscription),
+		ttlTimer:       time.NewTimer(streamer.clientTTLMillis * time.Millisecond),
 	}
 
 	streamer.clients[client.ID] = client
@@ -321,12 +325,21 @@ func (streamer *Streamer) Close(ctx context.Context) error {
 	streamer.mu.RLock()
 	defer streamer.mu.RUnlock()
 
-	// loop over all the client and close all the clients
-	for _, client := range streamer.clients {
-		go client.Close(ctx)
+	if len(streamer.clients) > 0 {
+		defer time.Sleep(time.Second)
 	}
 
-	defer time.Sleep(2 * time.Second)
+	wg := sync.WaitGroup{}
+	// loop over all the client and close all the clients
+	for _, client := range streamer.clients {
+		wg.Add(1)
+		go func(c *Client) {
+			c.Close(ctx)
+			wg.Done()
+		}(client)
+	}
+
+	wg.Wait()
 
 	return streamer.subClient.Close(ctx)
 }
