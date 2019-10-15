@@ -1,4 +1,4 @@
-// Package gochan is a small package for relaying pubsub messages to the web
+// Package unifrost is a small package for relaying pubsub messages to the web
 // via SSE(EventSource).
 // It is loosely based on Twitter's implementation for real-time event-streaming
 // in their new web app.
@@ -12,4 +12,4 @@
 //   Kafka
 //   In-memory (Only for testing)
 //
-package gochan
+package unifrost

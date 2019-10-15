@@ -1,4 +1,4 @@
-package gochan
+package unifrost
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rajveermalviya/gochan/drivers"
+	"github.com/rajveermalviya/unifrost/drivers"
 	"gocloud.dev/gcerrors"
 	"gocloud.dev/pubsub"
 )
@@ -68,7 +68,7 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0")
 	h.Set("Connection", "keep-alive")
-	h.Set("Server", "gochan")
+	h.Set("Server", "unifrost")
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -195,7 +195,7 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 					"error": map[string]string{
 						"topic":   topic,
 						"code":    "subscription-failure",
-						"message": fmt.Sprint("Cannot recieve message from subscription, closing subscription"),
+						"message": fmt.Sprint("Cannot receive message from subscription, closing subscription"),
 					},
 				})
 				client.messageChannel <- message{event: "message", payload: d}

@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rajveermalviya/gochan"
-	"github.com/rajveermalviya/gochan/drivers/memdriver"
+	"github.com/rajveermalviya/unifrost"
+	"github.com/rajveermalviya/unifrost/drivers/memdriver"
 	"gocloud.dev/pubsub"
 
 	// required for initializing mempubsub
@@ -36,9 +36,9 @@ func main() {
 
 	ctx := context.Background()
 
-	streamer, err := gochan.NewStreamer(
+	streamer, err := unifrost.NewStreamer(
 		&memdriver.Client{},
-		gochan.ClientTTL(2*time.Second),
+		unifrost.ClientTTL(2*time.Second),
 	)
 	if err != nil {
 		log.Fatalln("Error while starting streamer: ", err)
@@ -54,7 +54,7 @@ func main() {
 		log.Println("Gracefully closing the server")
 
 		if err := streamer.Close(ctx); err != nil {
-			log.Printf("Error occured while closing the streamer: %v : closing forcefully", err)
+			log.Printf("Error occurred while closing the streamer: %v : closing forcefully", err)
 		}
 
 		os.Exit(0)
@@ -122,7 +122,7 @@ func main() {
 	log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:3000", mux))
 }
 
-func updateSubscriptions(streamer *gochan.Streamer) http.HandlerFunc {
+func updateSubscriptions(streamer *unifrost.Streamer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method != "POST" {
@@ -162,7 +162,7 @@ func updateSubscriptions(streamer *gochan.Streamer) http.HandlerFunc {
 
 		for _, topic := range reqData.Add {
 			if err := streamer.Subscribe(ctx, reqData.ClientID, topic); err != nil {
-				if err == gochan.ErrNoClient {
+				if err == unifrost.ErrNoClient {
 					http.Error(w, "Invalid Client ID", http.StatusBadRequest)
 					return
 				}
@@ -171,7 +171,7 @@ func updateSubscriptions(streamer *gochan.Streamer) http.HandlerFunc {
 
 		for _, topic := range reqData.Remove {
 			if err := streamer.Unsubscribe(ctx, reqData.ClientID, topic); err != nil {
-				if err == gochan.ErrNoClient {
+				if err == unifrost.ErrNoClient {
 					http.Error(w, "Invalid Client ID", http.StatusBadRequest)
 					return
 				}

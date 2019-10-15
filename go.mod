@@ -1,4 +1,4 @@
-module github.com/rajveermalviya/gochan
+module github.com/rajveermalviya/unifrost
 
 go 1.13
 

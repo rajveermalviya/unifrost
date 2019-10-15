@@ -1,4 +1,4 @@
-package gochan
+package unifrost
 
 import (
 	"context"
