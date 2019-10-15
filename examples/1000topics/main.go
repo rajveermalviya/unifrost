@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/rajveermalviya/gochan"
-	"github.com/rajveermalviya/gochan/drivers"
+	"github.com/rajveermalviya/gochan/drivers/memdriver"
 	"gocloud.dev/pubsub"
 
 	// required for initializing mempubsub
@@ -36,10 +36,10 @@ func main() {
 
 	ctx := context.Background()
 
-	streamer, err := gochan.NewStreamer(ctx, &gochan.ConfigStreamer{
-		Driver:       drivers.DriverMem,
-		DriverConfig: &drivers.ConfigMem{},
-	})
+	streamer, err := gochan.NewStreamer(
+		&memdriver.Client{},
+		gochan.ClientTTL(2*time.Second),
+	)
 	if err != nil {
 		log.Fatalln("Error while starting streamer: ", err)
 	}
@@ -78,6 +78,7 @@ func main() {
 		streamer.ServeHTTP(w, r)
 	})
 
+	// Open 1000 topics via the in-memory driver.
 	go func() {
 		var topics = make([]*pubsub.Topic, numTopics)
 

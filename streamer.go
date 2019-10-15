@@ -25,41 +25,39 @@ type Streamer struct {
 	clientTTLMillis time.Duration
 }
 
-// ConfigStreamer struct is used to configure the Streamer.
-type ConfigStreamer struct {
-	// ClientTTL is the time-to-live duration to wait after cleaning the resources
-	// of a disconnected client.
-	// Default is a Minute.
-	ClientTTL time.Duration
-	// DriverConfig is config related to the specified driver
-	// See drivers package for more information.
-	DriverConfig interface{}
-	// Driver is the pubsub vendor driver to use.
-	Driver drivers.Driver
-}
-
 var (
 	// ErrNoClient is returned if the client-id is not registered in the streamer.
 	ErrNoClient = errors.New("streamer: Client doesn't exists")
 )
 
+// Options is a self-refrential function for configuration
+type Options func(*Streamer) error
+
 // NewStreamer is the construtor for Streamer struct
-func NewStreamer(ctx context.Context, c *ConfigStreamer) (*Streamer, error) {
-	subClient, err := drivers.NewSubscriberClient(ctx, c.Driver, c.DriverConfig)
-	if err != nil {
-		return nil, err
-	}
+func NewStreamer(subClient drivers.SubscriberClient, options ...Options) (*Streamer, error) {
 
-	// default to a minute of client cleanup timeout
-	if c.ClientTTL == time.Duration(0) {
-		c.ClientTTL = time.Minute
-	}
-
-	return &Streamer{
+	s := &Streamer{
 		subClient:       subClient,
 		clients:         make(map[string]*Client),
-		clientTTLMillis: time.Duration(c.ClientTTL.Milliseconds()),
-	}, nil
+		clientTTLMillis: time.Duration(time.Minute.Milliseconds()),
+	}
+
+	for _, option := range options {
+		if err := option(s); err != nil {
+			return nil, err
+		}
+	}
+
+	return s, nil
+}
+
+// ClientTTL is a config function that is used to set the client's TTL
+// default TTL is 1 minute
+func ClientTTL(t time.Duration) Options {
+	return func(s *Streamer) error {
+		s.clientTTLMillis = time.Duration(t.Milliseconds())
+		return nil
+	}
 }
 
 // ServeHTTP is the http handler for eventsource.

@@ -13,5 +13,5 @@ require (
 	gocloud.dev/pubsub/kafkapubsub v0.17.0
 	gocloud.dev/pubsub/natspubsub v0.17.0
 	gocloud.dev/pubsub/rabbitpubsub v0.17.0
-	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
+	google.golang.org/grpc v1.24.0
 )
