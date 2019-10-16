@@ -3,6 +3,7 @@
 [![GoDoc](https://godoc.org/github.com/rajveermalviya/unifrost?status.svg)](https://godoc.org/github.com/rajveermalviya/unifrost)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rajveermalviya/unifrost)](https://goreportcard.com/report/rajveermalviya/unifrost)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frajveermalviya%2Funifrost.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Frajveermalviya%2Funifrost?ref=badge_shield)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3298/badge)](https://bestpractices.coreinfrastructure.org/projects/3298)
 
 ⚠ This project is on early stage, it's not ready for production yet ⚠
 
@@ -13,8 +14,7 @@ unifrost is a go module for relaying pubsub messages to the web via
 It is based on Twitter's implementation for real-time event-streaming
 in their new web app.
 
-unifrost is named after bifrost that is a MCU reference that is able to transport
-both ways but because SSE works only one way hence unifrost. 😎
+unifrost is named after bifrost, the rainbow bridge that connects Asgard with Midgard (Earth), that is MCU reference which is able to transport people both ways. But because unifrost sends messages from server to client (only one way), hence unifrost. 😎
 
 It uses the [Go CDK](https://gocloud.dev) as vendor neutral pubsub driver
 that supports multiple pubusub vendors:
@@ -184,6 +184,10 @@ ability to send arbitrary events.
 Because SSE works on top of HTTP, it always stays updated. For example HTTP/3
 will use QUIC protocol as transport layer that improves data streaming and many
 more improvements.
+
+## Community:
+
+Join the #unifrost channel on [gophers](https://gophers.slack.com/messages/unifrost) Slack Workspace for questions and discussions.
 
 ## Future Goals:
 
