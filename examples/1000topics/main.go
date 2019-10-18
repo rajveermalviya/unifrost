@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"strconv"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/rajveermalviya/unifrost"
@@ -47,7 +46,7 @@ func main() {
 
 	// add a signal notifier to close the streamer gracefully
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigs, os.Interrupt, os.Kill)
 
 	go func() {
 		log.Println("sig:", <-sigs)

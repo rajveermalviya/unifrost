@@ -16,6 +16,8 @@ type Client struct {
 	topics         map[string]*pubsub.Subscription
 	mu             sync.RWMutex
 	ttlTimer       *time.Timer
+	disconnected   bool
+	timerStopped   chan bool
 }
 
 type message struct {

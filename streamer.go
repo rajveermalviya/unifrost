@@ -91,9 +91,13 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Stop the timeout timer if it is running.
-	client.mu.RLock()
-	client.ttlTimer.Stop()
-	client.mu.RUnlock()
+	client.mu.Lock()
+	if client.disconnected == true {
+		client.disconnected = false
+		client.ttlTimer.Stop()
+		client.timerStopped <- true
+	}
+	client.mu.Unlock()
 
 	log.Printf("Client %s connected", clientID)
 
@@ -121,13 +125,18 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		client.mu.Lock()
 		client.ttlTimer = timer
+		client.disconnected = true
 		client.mu.Unlock()
 
 		// cleanup the resources if the timer is expired
-		if _, ok := <-timer.C; ok {
+		select {
+		case <-client.timerStopped:
+			return
+		case <-timer.C:
 			log.Printf("Disconnected client %s timed out, cleaning...", clientID)
 			streamer.RemoveClient(context.Background(), clientID)
 		}
+
 	}()
 
 	for data := range client.messageChannel {
