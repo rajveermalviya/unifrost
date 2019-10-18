@@ -214,8 +214,16 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 				client.mu.Lock()
 				delete(client.topics, topic)
 				client.mu.Unlock()
-				break
+				return
 			}
+
+			client.mu.RLock()
+			if client.disconnected == true {
+				client.mu.RUnlock()
+				msg.Ack()
+				return
+			}
+			client.mu.RUnlock()
 
 			client.messageChannel <- message{event: topic, payload: msg.Body}
 			msg.Ack()

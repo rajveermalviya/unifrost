@@ -22,14 +22,14 @@ import (
 )
 
 var (
-	numTopics int
-	interval  time.Duration
+	numTopics *int
+	interval  *time.Duration
 )
 
 func main() {
+	numTopics = flag.Int("topics", 100000, "Number of topics")
+	interval = flag.Duration("interval", time.Second, "Time interval")
 	flag.Parse()
-	numTopics = *flag.Int("topics", 1000, "Number of topics")
-	interval = *flag.Duration("interval", time.Second, "Time interval")
 
 	log.SetFlags(log.Lshortfile)
 
@@ -79,9 +79,9 @@ func main() {
 
 	// Open 1000 topics via the in-memory driver.
 	go func() {
-		var topics = make([]*pubsub.Topic, numTopics)
+		var topics = make([]*pubsub.Topic, *numTopics)
 
-		for i := 0; i < numTopics; i++ {
+		for i := 0; i < *numTopics; i++ {
 			topic, err := pubsub.OpenTopic(ctx, "mem://topic"+strconv.Itoa(i))
 			if err != nil {
 				log.Fatal(err)
@@ -89,7 +89,7 @@ func main() {
 			topics[i] = topic
 		}
 
-		log.Printf("Opened %v topics\n", numTopics)
+		log.Printf("Opened %v topics\n", *numTopics)
 		log.Printf("Sending message every %vs\n", interval.Seconds())
 
 		for {
@@ -97,7 +97,7 @@ func main() {
 
 			var wg sync.WaitGroup
 
-			for j := 0; j < numTopics; j++ {
+			for j := 0; j < *numTopics; j++ {
 				wg.Add(1)
 				go func(i int) {
 					eventString := fmt.Sprintf("Topic%v %v", i, time.Now())
@@ -111,7 +111,7 @@ func main() {
 					wg.Done()
 				}(j)
 			}
-			time.Sleep(interval)
+			time.Sleep(*interval)
 			wg.Wait()
 		}
 	}()
