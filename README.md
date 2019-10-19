@@ -159,7 +159,7 @@ When a client gets disconnected it has a time window to connect to the server
 again with the state unchanged. If client ttl is not specified in the
 streamer config then default ttl is set to one.
 
-To know more, check out the [example](examples/1000topics)
+To know more, check out the [example](examples/nats_example)
 
 ## Why Server Sent Events (SSE) ?
 

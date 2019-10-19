@@ -16,7 +16,7 @@ type Client struct {
 	topics         map[string]*pubsub.Subscription
 	mu             sync.RWMutex
 	ttlTimer       *time.Timer
-	disconnected   bool
+	connected      bool
 	timerStopped   chan bool
 }
 
@@ -25,27 +25,32 @@ type message struct {
 	payload []byte
 }
 
-// GetTopics method returns an array of all the topics client is subscribed to.
+// GetTopics returns a slice of all the topics client is subscribed to.
 func (client *Client) GetTopics(ctx context.Context) []string {
 	client.mu.RLock()
 	defer client.mu.RUnlock()
 
-	keys := make([]string, 0, len(client.topics))
+	topics := make([]string, 0, len(client.topics))
 	for key := range client.topics {
-		keys = append(keys, key)
+		topics = append(topics, key)
 	}
 
-	return keys
+	return topics
 }
 
-// TotalTopics method returns the number of topics the client is subscribed to.
+// TotalTopics reports the number of topics the client is subscribed to.
 func (client *Client) TotalTopics(ctx context.Context) int {
 	client.mu.RLock()
 	defer client.mu.RUnlock()
 	return len(client.topics)
 }
 
-// Close method closes the client and shutdowns all the subscriptions.
+// Connected reports whether client is connected to the server.
+func (client *Client) Connected() bool {
+	return client.connected
+}
+
+// Close closes the client and shutdowns all the subscriptions.
 func (client *Client) Close(ctx context.Context) error {
 	client.mu.Lock()
 	defer client.mu.Unlock()
@@ -57,8 +62,8 @@ func (client *Client) Close(ctx context.Context) error {
 	}
 
 	// loop over all the topics and shut them down
-	for key, topic := range client.topics {
-		if err := topic.Shutdown(ctx); err != nil {
+	for key, sub := range client.topics {
+		if err := sub.Shutdown(ctx); err != nil {
 			log.Println("streamer: ", err)
 		}
 		delete(client.topics, key)

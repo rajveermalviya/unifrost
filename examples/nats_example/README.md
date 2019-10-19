@@ -1,8 +1,25 @@
-# 1000topics example
+# NATS example
 
-This example will create 1000 topics using the In-memory driver.
+To run the example, first run the nats server using docker
 
-To run the example
+```shell
+docker run --rm -it -p 4222:4222 nats
+```
+
+Then, in another terminal session start the topic publisher
+
+```shell
+go run publisher.go
+```
+
+You can also configure how many topics the publisher should create
+and at what time interval every message is sent.
+
+```shell
+go run publisher.go --topics 100 --interval 1s
+```
+
+Then start the unifrost example server
 
 ```shell
 go run main.go

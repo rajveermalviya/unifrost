@@ -3,46 +3,39 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
-	"sync"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/rajveermalviya/unifrost"
-	"github.com/rajveermalviya/unifrost/drivers/memdriver"
-	"gocloud.dev/pubsub"
-
-	// required for initializing mempubsub
-	_ "gocloud.dev/pubsub/mempubsub"
-)
-
-var (
-	numTopics *int
-	interval  *time.Duration
+	"github.com/rajveermalviya/unifrost/drivers/natsdriver"
 )
 
 func main() {
-	numTopics = flag.Int("topics", 100000, "Number of topics")
-	interval = flag.Duration("interval", time.Second, "Time interval")
-	flag.Parse()
-
 	log.SetFlags(log.Lshortfile)
 
 	ctx := context.Background()
 
+	natsConn, err := nats.Connect(nats.DefaultURL)
+	if err != nil {
+		log.Fatalln("Error while connecting to nats server: ", err)
+	}
+
+	subClient, err := natsdriver.NewClient(ctx, natsConn)
+	if err != nil {
+		log.Fatalln("Error while creating new client: ", err)
+	}
+
 	streamer, err := unifrost.NewStreamer(
-		&memdriver.Client{},
+		subClient,
 		unifrost.ClientTTL(2*time.Second),
 	)
 	if err != nil {
 		log.Fatalln("Error while starting streamer: ", err)
 	}
-	defer streamer.Close(ctx)
 
 	// add a signal notifier to close the streamer gracefully
 	sigs := make(chan os.Signal, 1)
@@ -77,50 +70,13 @@ func main() {
 		streamer.ServeHTTP(w, r)
 	})
 
-	// Open 1000 topics via the in-memory driver.
-	go func() {
-		var topics = make([]*pubsub.Topic, *numTopics)
-
-		for i := 0; i < *numTopics; i++ {
-			topic, err := pubsub.OpenTopic(ctx, "mem://topic"+strconv.Itoa(i))
-			if err != nil {
-				log.Fatal(err)
-			}
-			topics[i] = topic
-		}
-
-		log.Printf("Opened %v topics\n", *numTopics)
-		log.Printf("Sending message every %vs\n", interval.Seconds())
-
-		for {
-			log.Println("Sending message")
-
-			var wg sync.WaitGroup
-
-			for j := 0; j < *numTopics; j++ {
-				wg.Add(1)
-				go func(i int) {
-					eventString := fmt.Sprintf("Topic%v %v", i, time.Now())
-
-					d, _ := json.Marshal(map[string]string{"payload": eventString})
-
-					err := topics[i].Send(ctx, &pubsub.Message{Body: d})
-					if err != nil {
-						log.Fatal(err)
-					}
-					wg.Done()
-				}(j)
-			}
-			time.Sleep(*interval)
-			wg.Wait()
-		}
-	}()
-
 	log.Println("Starting server on port 3000")
 
 	log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:3000", mux))
 }
 
+// updateSubscriptions is a helper handler to use the server without any
+// authentication for subscribing and unsubscribing to topics for a client
 func updateSubscriptions(streamer *unifrost.Streamer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -132,7 +88,6 @@ func updateSubscriptions(streamer *unifrost.Streamer) http.HandlerFunc {
 		h := w.Header()
 		h.Set("Cache-Control", "no-cache")
 		h.Set("Connection", "keep-alive")
-		h.Set("Access-Control-Allow-Origin", "*")
 
 		type updateSubscriptionsData struct {
 			ClientID string   `json:"client_id,omitempty"`

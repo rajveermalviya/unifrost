@@ -92,8 +92,8 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Stop the timeout timer if it is running.
 	client.mu.Lock()
-	if client.disconnected == true {
-		client.disconnected = false
+	if client.connected == false {
+		client.connected = true
 		client.ttlTimer.Stop()
 		client.timerStopped <- true
 	}
@@ -125,7 +125,7 @@ func (streamer *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		client.mu.Lock()
 		client.ttlTimer = timer
-		client.disconnected = true
+		client.connected = false
 		client.mu.Unlock()
 
 		// cleanup the resources if the timer is expired
@@ -204,7 +204,7 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 					"error": map[string]string{
 						"topic":   topic,
 						"code":    "subscription-failure",
-						"message": fmt.Sprint("Cannot receive message from subscription, closing subscription"),
+						"message": "Cannot receive message from subscription, closing subscription",
 					},
 				})
 				client.messageChannel <- message{event: "message", payload: d}
@@ -218,7 +218,7 @@ func (streamer *Streamer) Subscribe(ctx context.Context, clientID string, topic 
 			}
 
 			client.mu.RLock()
-			if client.disconnected == true {
+			if client.connected == false {
 				client.mu.RUnlock()
 				msg.Ack()
 				return
@@ -267,6 +267,7 @@ func (streamer *Streamer) NewClient(ctx context.Context) (*Client, error) {
 		messageChannel: make(chan message, 10),
 		topics:         make(map[string]*pubsub.Subscription),
 		ttlTimer:       time.NewTimer(streamer.clientTTLMillis * time.Millisecond),
+		connected:      true,
 	}
 
 	streamer.clients[client.ID] = client
@@ -284,6 +285,7 @@ func (streamer *Streamer) NewCustomClient(ctx context.Context, clientID string) 
 		messageChannel: make(chan message, 10),
 		topics:         make(map[string]*pubsub.Subscription),
 		ttlTimer:       time.NewTimer(streamer.clientTTLMillis * time.Millisecond),
+		connected:      true,
 	}
 
 	streamer.clients[client.ID] = client
