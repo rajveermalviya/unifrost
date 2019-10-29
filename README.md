@@ -9,15 +9,17 @@
 
 Previously named gochan
 
-unifrost is a go module for relaying pubsub messages to the web via
-[SSE(Eventsource)](https://en.wikipedia.org/wiki/Server-sent_events).
-It is based on Twitter's implementation for real-time event-streaming
-in their new web app.
+unifrost is a go module for relaying pubsub messages to the web via [SSE(Eventsource)](https://en.wikipedia.org/wiki/Server-sent_events).
+It is based on Twitter's implementation for real-time event-streamingin their
+new web app.
 
-unifrost is named after bifrost, the rainbow bridge that connects Asgard with Midgard (Earth), that is MCU reference which is able to transport people both ways. But because unifrost sends messages from server to client (only one way), hence unifrost. 😎
+unifrost is named after bifrost, the rainbow bridge that connects Asgard with
+Midgard (Earth), that is MCU reference which is able to transport people both
+ways. But because unifrost sends messages from server to client (only one way),
+hence unifrost. 😎
 
-It uses the [Go CDK](https://gocloud.dev) as vendor neutral pubsub driver
-that supports multiple pubusub vendors:
+It uses the [Go CDK](https://gocloud.dev) as vendor neutral pubsub driver that
+supports multiple pubusub vendors:
 
 - Google Cloud Pub/Sub
 - Amazon Simple Queueing Service (Pending)
@@ -43,9 +45,9 @@ For documentation check [godoc](https://godoc.org/github.com/rajveermalviya/unif
 
 unifrost uses Server-Sent-Events, because of this it doesn't require to run a
 standalone server, unlike websockets it can be embedded in your api server.
-unifrost's streamer has a ServeHTTP method i.e it implements http.Handler
-interface so that it can be used directly or can be wrapped with middlewares
-like Authentication easily.
+unifrost's streamer has a ServeHTTP method i.e it implements http.Handler interface
+so that it can be used directly or can be wrapped with middlewares like
+Authentication easily.
 
 ```go
 // Using streamer directly
@@ -106,12 +108,10 @@ Example error messaage:
 }
 ```
 
-All the info events are streamed over message channel i.e using the
-EventSource JS API, `onmessage` or `addEventListener('message', () => {})`
-method will listen to them.
-All the subscription events have event name same as their topic name, so to
-listen to topic events you need to add an event-listener on the EventSource
-object.
+All the info events are streamed over message channel i.e using the EventSource JS API,
+`onmessage` or `addEventListener('message', () => {})` method will listen to them.
+All the subscription events have event name same as their topic name, so to listen to
+topic events you need to add an event-listener on the EventSource object.
 
 Client example:
 
@@ -181,13 +181,15 @@ protocol. In addition, Server-Sent Events have a variety of features that
 WebSockets lack by design such as automatic reconnection, event IDs, and the
 ability to send arbitrary events.
 
-Because SSE works on top of HTTP, it always stays updated. For example HTTP/3
-will use QUIC protocol as transport layer that improves data streaming and many
-more improvements.
+Because SSE works on top of HTTP, HTTP protocol improvements can also benefit SSE.
+For example, the in-development HTTP/3 protocol, built on top of QUIC, could
+offer additional performance improvements in the presence of packet loss due to
+lack of head-of-line blocking. 
 
 ## Community:
 
-Join the #unifrost channel on [gophers](https://gophers.slack.com/messages/unifrost) Slack Workspace for questions and discussions.
+Join the #unifrost channel on [gophers](https://gophers.slack.com/messages/unifrost)
+Slack Workspace for questions and discussions.
 
 ## Future Goals:
 
