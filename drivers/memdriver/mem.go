@@ -5,7 +5,7 @@ import (
 
 	"gocloud.dev/pubsub"
 
-	// required for initializing mempubsub
+	// required for initializing mempubsub url opener
 	_ "gocloud.dev/pubsub/mempubsub"
 )
 

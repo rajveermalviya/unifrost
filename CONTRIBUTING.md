@@ -5,9 +5,8 @@ accept contributions and encourage you to get involved!
 
 ## Bug Reports
 
-First, please [search this
-repository](https://github.com/rajveermalviya/unifrost/search?q=&type=Issues&utf8=%E2%9C%93) with a variety
-of keywords to ensure your bug is not already reported.
+First, please [search this repository](https://github.com/rajveermalviya/unifrost/search?q=&type=Issues&utf8=%E2%9C%93)
+with a variety of keywords to ensure your bug is not already reported.
 
 If not, [open an issue](https://github.com/rajveermalviya/unifrost/issues) and answer the questions so we
 can understand and reproduce the problematic behavior.
@@ -47,12 +46,14 @@ faster.
 We use [Go Modules](https://github.com/golang/go/wiki/Modules) as the tool to manage vendor dependencies.
 
 Use the following to update the version of all dependencies
+
 ```shell
 $ go get -u
 ```
 
 After the dependencies have been updated or added, you might run the following to
 cleanup the go module files:
+
 ```shell
 $ go mod tidy
 ```

@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rajveermalviya/unifrost/drivers"
 	"gocloud.dev/gcerrors"
 	"gocloud.dev/pubsub"
+
+	"github.com/rajveermalviya/unifrost/drivers"
 )
 
 // Streamer is a top-level struct that will handle all the clients and subscriptions.
@@ -30,11 +31,11 @@ var (
 	ErrNoClient = errors.New("streamer: Client doesn't exists")
 )
 
-// Options is a self-refrential function for configuration
-type Options func(*Streamer) error
+// Option is a self-refrential function for configuration
+type Option func(*Streamer) error
 
 // NewStreamer is the construtor for Streamer struct
-func NewStreamer(subClient drivers.SubscriberClient, options ...Options) (*Streamer, error) {
+func NewStreamer(subClient drivers.SubscriberClient, options ...Option) (*Streamer, error) {
 
 	s := &Streamer{
 		subClient:       subClient,
@@ -51,9 +52,9 @@ func NewStreamer(subClient drivers.SubscriberClient, options ...Options) (*Strea
 	return s, nil
 }
 
-// ClientTTL is a config function that is used to set the client's TTL
+// ClientTTL is an option that is used to set the client's TTL
 // default TTL is 1 minute
-func ClientTTL(t time.Duration) Options {
+func ClientTTL(t time.Duration) Option {
 	return func(s *Streamer) error {
 		s.clientTTLMillis = time.Duration(t.Milliseconds())
 		return nil

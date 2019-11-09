@@ -19,11 +19,11 @@ type Config struct {
 	NatsOpts nats.Option
 }
 
-// Options is a self-refrential function for configuration
-type Options func(*Client) error
+// Option is a self-refrential function for configuration
+type Option func(*Client) error
 
 // NewClient constructor creates the client with the specified config
-func NewClient(ctx context.Context, conn *nats.Conn, opts ...Options) (*Client, error) {
+func NewClient(ctx context.Context, conn *nats.Conn, opts ...Option) (*Client, error) {
 
 	c := &Client{conn: conn}
 

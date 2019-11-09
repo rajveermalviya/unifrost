@@ -16,11 +16,11 @@ type Client struct {
 	projectID gcp.ProjectID
 }
 
-// Options is a self-refrential function for configuration
-type Options func(*Client) error
+// Option is a self-refrential function type for configuration
+type Option func(*Client) error
 
 // NewClient constructor connects to the GCP PubSub API and creates a client
-func NewClient(ctx context.Context, conn *grpc.ClientConn, projectID gcp.ProjectID, opts ...Options) (*Client, error) {
+func NewClient(ctx context.Context, conn *grpc.ClientConn, projectID gcp.ProjectID, opts ...Option) (*Client, error) {
 	subClient, err := gcppubsub.SubscriberClient(ctx, conn)
 	if err != nil {
 		return nil, err

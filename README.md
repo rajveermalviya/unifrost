@@ -143,7 +143,7 @@ use the following middleware with the streamer.
 
 ```go
 mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
-    // Auto generate new clientID, when new client connects.
+    // Auto generate new clientID, when new client connects. (Not recommended)
     q := r.URL.Query()
     if q.Get("id") == "" {
         client, _ := streamer.NewClient(ctx)
@@ -184,7 +184,7 @@ ability to send arbitrary events.
 Because SSE works on top of HTTP, HTTP protocol improvements can also benefit SSE.
 For example, the in-development HTTP/3 protocol, built on top of QUIC, could
 offer additional performance improvements in the presence of packet loss due to
-lack of head-of-line blocking. 
+lack of head-of-line blocking.
 
 ## Community:
 

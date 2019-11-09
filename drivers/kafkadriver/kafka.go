@@ -15,8 +15,8 @@ type Client struct {
 	brokers []string
 }
 
-// Options is a self-refrential function for configuration
-type Options func(*Client) error
+// Option is a self-refrential function for configuration
+type Option func(*Client) error
 
 // NewClient constructor creates the client using the specified config
 // sarama is used internally to connect to kafka brokers
@@ -28,7 +28,7 @@ func NewClient(
 	brokers []string,
 	groupID string,
 	config *sarama.Config,
-	opts ...Options,
+	opts ...Option,
 ) (*Client, error) {
 
 	c := &Client{config: config, brokers: brokers, groupID: groupID}

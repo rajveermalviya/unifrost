@@ -13,12 +13,12 @@ type Client struct {
 	conn *amqp.Connection
 }
 
-// Options is a self-refrential function for configuration
-type Options func(*Client) error
+// Option is a self-refrential function for configuration
+type Option func(*Client) error
 
 // NewClient constructor creates connects to the RabbitMQ API using the specified url
 // url should be in AMQP URI format
-func NewClient(ctx context.Context, url string, opts ...Options) (*Client, error) {
+func NewClient(ctx context.Context, url string, opts ...Option) (*Client, error) {
 
 	rabbitConn, err := amqp.Dial(url)
 	if err != nil {
