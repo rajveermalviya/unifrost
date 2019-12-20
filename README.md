@@ -18,7 +18,7 @@ ways. But because unifrost sends messages from server to client (only one way),
 hence unifrost. 😎
 
 It uses the [Go CDK](https://gocloud.dev) as vendor neutral pubsub driver that
-supports multiple pubusub vendors:
+supports multiple pubsub vendors:
 
 - Google Cloud Pub/Sub
 - Amazon Simple Queueing Service (Pending)
