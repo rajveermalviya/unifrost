@@ -9,7 +9,7 @@
 Previously named gochan
 
 unifrost is a go module for relaying pubsub messages to the web via [SSE(Eventsource)](https://en.wikipedia.org/wiki/Server-sent_events).
-It is based on Twitter's implementation for real-time event-streamingin their
+It is based on Twitter's implementation for real-time event-streaming in their
 new web app.
 
 unifrost is named after bifrost, the rainbow bridge that connects Asgard with
