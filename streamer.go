@@ -14,7 +14,7 @@ import (
 	"gocloud.dev/gcerrors"
 	"gocloud.dev/pubsub"
 
-	"github.com/rajveermalviya/unifrost/drivers"
+	"github.com/unifrost/unifrost/drivers"
 )
 
 // Streamer is a top-level struct that will handle all the clients and subscriptions.

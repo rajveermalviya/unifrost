@@ -1,8 +1,7 @@
 # unifrost: A go module that makes it easier to stream pubsub events to the web
 
-[![GoDoc](https://godoc.org/github.com/rajveermalviya/unifrost?status.svg)](https://godoc.org/github.com/rajveermalviya/unifrost)
-[![Go Report Card](https://goreportcard.com/badge/github.com/rajveermalviya/unifrost)](https://goreportcard.com/report/rajveermalviya/unifrost)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frajveermalviya%2Funifrost.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Frajveermalviya%2Funifrost?ref=badge_shield)
+[![GoDoc](https://godoc.org/github.com/unifrost/unifrost?status.svg)](https://godoc.org/github.com/unifrost/unifrost)
+[![Go Report Card](https://goreportcard.com/badge/github.com/unifrost/unifrost)](https://goreportcard.com/report/rajveermalviya/unifrost)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3298/badge)](https://bestpractices.coreinfrastructure.org/projects/3298)
 
 ⚠ This project is on early stage, it's not ready for production yet ⚠
@@ -34,12 +33,12 @@ supports multiple pubusub vendors:
 unifrost supports Go modules and built against go version 1.13
 
 ```shell
-go get github.com/rajveermalviya/unifrost
+go get github.com/unifrost/unifrost
 ```
 
 ## Documentation
 
-For documentation check [godoc](https://godoc.org/github.com/rajveermalviya/unifrost).
+For documentation check [godoc](https://godoc.org/github.com/unifrost/unifrost).
 
 ## Usage
 
@@ -214,4 +213,4 @@ You can also support by sponsoring the project via [PayPal](https://paypal.me/ra
 
 ## License
 
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frajveermalviya%2Funifrost.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Frajveermalviya%2Funifrost?ref=badge_large)
+[APACHE v2](LICENSE)

@@ -5,10 +5,10 @@ accept contributions and encourage you to get involved!
 
 ## Bug Reports
 
-First, please [search this repository](https://github.com/rajveermalviya/unifrost/search?q=&type=Issues&utf8=%E2%9C%93)
+First, please [search this repository](https://github.com/unifrost/unifrost/search?q=&type=Issues&utf8=%E2%9C%93)
 with a variety of keywords to ensure your bug is not already reported.
 
-If not, [open an issue](https://github.com/rajveermalviya/unifrost/issues) and answer the questions so we
+If not, [open an issue](https://github.com/unifrost/unifrost/issues) and answer the questions so we
 can understand and reproduce the problematic behavior.
 
 The burden is on you to convince us that it is actually a bug in Unifrost. This is easiest to do when
@@ -20,12 +20,12 @@ Please be kind. :smile:
 
 ## Minor Improvements and New Tests
 
-Submit [pull requests](https://github.com/rajveermalviya/unifrost/pulls) at any time. Make sure to write
+Submit [pull requests](https://github.com/unifrost/unifrost/pulls) at any time. Make sure to write
 tests to assert your change is working properly and is thoroughly covered.
 
 ## New Features
 
-First, please [search](https://github.com/rajveermalviya/unifrost/search?q=&type=Issues&utf8=%E2%9C%93) with
+First, please [search](https://github.com/unifrost/unifrost/search?q=&type=Issues&utf8=%E2%9C%93) with
 a variety of keywords to ensure your suggestion/proposal is new.
 
 Please also check for existing pull requests to see if someone is already working on this. We want
