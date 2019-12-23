@@ -3,23 +3,27 @@ package azrsbdriver
 import (
 	"context"
 	"fmt"
-	"net/url"
 
+	servicebus "github.com/Azure/azure-service-bus-go"
 	"gocloud.dev/pubsub"
 	"gocloud.dev/pubsub/azuresb"
 )
 
 // Client handles subscriptions to the Azure Service Bus
 type Client struct {
-	urlOpener *azuresb.URLOpener
+	namespace *servicebus.Namespace
 }
 
 // Option is a self-refrential function for configuration
 type Option func(*Client) error
 
-// NewClient constructs a new URL Opener client
-func NewClient(urlOpener *azuresb.URLOpener, opts ...Option) (*Client, error) {
-	c := &Client{urlOpener}
+// NewClient constructs a new namespace for Azure
+func NewClient(conn string, opts ...Option) (*Client, error) {
+	ns, err := azuresb.NewNamespaceFromConnectionString(conn)
+	if err != nil {
+		return nil, err
+	}
+	c := &Client{namespace: ns}
 	for _, option := range opts {
 		if err := option(c); err != nil {
 			return nil, err
@@ -28,13 +32,18 @@ func NewClient(urlOpener *azuresb.URLOpener, opts ...Option) (*Client, error) {
 	return c, nil
 }
 
+/*
+subscription, err := azuresb.OpenSubscription(ctx,
+    busNamespace, busTopic, busSub, nil)
+if err != nil {
+    log.Fatal(err)
+}
+defer subscription.Shutdown(ctx)
+*/
+
 // Subscribe ...
-func (client *Client) Subscribe(ctx context.Context, subURL string) (*pubsub.Subscription, error) {
-	url, err := url.Parse(subURL)
-	if err != nil {
-		return nil, err
-	}
-	return client.urlOpener.OpenSubscriptionURL(ctx, url)
+func (client *Client) Subscribe(ctx context.Context, url string) (*pubsub.Subscription, error) {
+	return nil, nil
 }
 
 // Close is just a placeholder

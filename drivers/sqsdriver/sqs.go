@@ -3,23 +3,24 @@ package sqsdriver
 import (
 	"context"
 	"fmt"
-	"net/url"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"gocloud.dev/pubsub"
 	"gocloud.dev/pubsub/awssnssqs"
 )
 
 // Client handles the communicating with SQS. This holds the config provider needed to make the request.
 type Client struct {
-	urlOpener *awssnssqs.URLOpener
+	session *session.Session
 }
 
 // Option is a self-refrential function for configuration
 type Option func(*Client) error
 
 // NewClient ...
-func NewClient(ctx context.Context, urlOpener *awssnssqs.URLOpener, opts ...Option) (*Client, error) {
-	c := &Client{urlOpener}
+func NewClient(ctx context.Context, config *aws.Config, opts ...Option) (*Client, error) {
+	c := &Client{session: session.New(config)}
 	for _, option := range opts {
 		if err := option(c); err != nil {
 			return nil, err
@@ -30,12 +31,8 @@ func NewClient(ctx context.Context, urlOpener *awssnssqs.URLOpener, opts ...Opti
 }
 
 // Subscribe method subscribes to the given SQS url
-func (client *Client) Subscribe(ctx context.Context, sqsURL string) (*pubsub.Subscription, error) {
-	url, err := url.Parse(sqsURL)
-	if err != nil {
-		return nil, err
-	}
-	return client.urlOpener.OpenSubscriptionURL(ctx, url)
+func (client *Client) Subscribe(ctx context.Context, url string) (*pubsub.Subscription, error) {
+	return awssnssqs.OpenSubscription(ctx, client.session, url, nil), nil
 }
 
 // Close is just a placeholder
