@@ -1,7 +1,7 @@
 # unifrost: A go module that makes it easier to stream pubsub events to the web
 
 [![GoDoc](https://godoc.org/github.com/unifrost/unifrost?status.svg)](https://godoc.org/github.com/unifrost/unifrost)
-[![Go Report Card](https://goreportcard.com/badge/github.com/unifrost/unifrost)](https://goreportcard.com/report/rajveermalviya/unifrost)
+[![Go Report Card](https://goreportcard.com/badge/github.com/unifrost/unifrost)](https://goreportcard.com/report/unifrost/unifrost)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3298/badge)](https://bestpractices.coreinfrastructure.org/projects/3298)
 
 ⚠ This project is on early stage, it's not ready for production yet ⚠
