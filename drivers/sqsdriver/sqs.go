@@ -3,14 +3,16 @@ package sqsdriver
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"gocloud.dev/pubsub"
+	"gocloud.dev/pubsub/awssnssqs"
 )
 
-// Client handles the receiving from queues
+// Client handles the communicating with SQS. This holds the config provider needed to make the request.
 type Client struct {
-	subClient *sqs.SQS
+	urlOpener *awssnssqs.URLOpener
 }
 
 // Option is a self-refrential function for configuration
@@ -18,10 +20,7 @@ type Option func(*Client) error
 
 // NewClient ...
 func NewClient(ctx context.Context, prov client.ConfigProvider, opts ...Option) (*Client, error) {
-	svc := sqs.New(prov)
-
-	c := &Client{subClient: svc}
-
+	c := &Client{&awssnssqs.URLOpener{ConfigProvider: prov}}
 	for _, option := range opts {
 		if err := option(c); err != nil {
 			return nil, err
@@ -31,12 +30,18 @@ func NewClient(ctx context.Context, prov client.ConfigProvider, opts ...Option) 
 	return c, nil
 }
 
-// Subscribe ...
-func (client *Client) Subscribe(ctx context.Context, topic string) (interface{}, error) {
-	return nil, nil
+// Subscribe method subscribes to the given SQS url
+func (client *Client) Subscribe(ctx context.Context, sqsURL string) (*pubsub.Subscription, error) {
+	url, err := url.Parse(sqsURL)
+	if err != nil {
+		return nil, err
+	}
+	return client.urlOpener.OpenSubscriptionURL(ctx, url)
 }
 
 // Close is just a placeholder
+// to close the subscription or topic, `subscription.Shutdown(ctx)`
+// should be called
 func (client *Client) Close(ctx context.Context) error {
 	return fmt.Errorf("not implemented")
 }
