@@ -9,7 +9,7 @@
 Previously named gochan
 
 unifrost is a go module for relaying pubsub messages to the web via [SSE(Eventsource)](https://en.wikipedia.org/wiki/Server-sent_events).
-It is based on Twitter's implementation for real-time event-streamingin their
+It is based on Twitter's implementation for real-time event-streaming in their
 new web app.
 
 unifrost is named after bifrost, the rainbow bridge that connects Asgard with
@@ -18,7 +18,7 @@ ways. But because unifrost sends messages from server to client (only one way),
 hence unifrost. 😎
 
 It uses the [Go CDK](https://gocloud.dev) as vendor neutral pubsub driver that
-supports multiple pubusub vendors:
+supports multiple pubsub vendors:
 
 - Google Cloud Pub/Sub
 - Amazon Simple Queueing Service (Pending)
