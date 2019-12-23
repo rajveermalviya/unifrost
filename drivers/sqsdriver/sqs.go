@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/aws/aws-sdk-go/aws/client"
 	"gocloud.dev/pubsub"
 	"gocloud.dev/pubsub/awssnssqs"
 )
@@ -19,8 +18,8 @@ type Client struct {
 type Option func(*Client) error
 
 // NewClient ...
-func NewClient(ctx context.Context, prov client.ConfigProvider, opts ...Option) (*Client, error) {
-	c := &Client{&awssnssqs.URLOpener{ConfigProvider: prov}}
+func NewClient(ctx context.Context, urlOpener *awssnssqs.URLOpener, opts ...Option) (*Client, error) {
+	c := &Client{urlOpener}
 	for _, option := range opts {
 		if err := option(c); err != nil {
 			return nil, err
