@@ -21,7 +21,7 @@ It uses the [Go CDK](https://gocloud.dev) as vendor neutral pubsub driver that
 supports multiple pubsub vendors:
 
 - Google Cloud Pub/Sub
-- Amazon Simple Queueing Service (Pending)
+- Amazon Simple Queueing Service
 - Azure Service Bus (Pending)
 - RabbitMQ
 - NATS
