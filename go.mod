@@ -5,6 +5,7 @@ go 1.13
 require (
 	cloud.google.com/go/pubsub v1.1.0
 	github.com/Shopify/sarama v1.24.1
+	github.com/aws/aws-sdk-go v1.19.45
 	github.com/google/uuid v1.1.1
 	github.com/klauspost/cpuid v1.2.2 // indirect
 	github.com/nats-io/nats.go v1.9.1
