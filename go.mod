@@ -4,7 +4,6 @@ go 1.13
 
 require (
 	cloud.google.com/go/pubsub v1.1.0
-	github.com/Azure/azure-service-bus-go v0.9.1
 	github.com/Shopify/sarama v1.24.1
 	github.com/aws/aws-sdk-go v1.19.45
 	github.com/google/uuid v1.1.1

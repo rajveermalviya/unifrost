@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"gocloud.dev/pubsub"
 	"gocloud.dev/pubsub/awssnssqs"
@@ -18,9 +17,9 @@ type Client struct {
 // Option is a self-refrential function for configuration
 type Option func(*Client) error
 
-// NewClient ...
-func NewClient(ctx context.Context, config *aws.Config, opts ...Option) (*Client, error) {
-	c := &Client{session: session.New(config)}
+// NewClient establishes session to the AWS cloud service.
+func NewClient(ctx context.Context, session *session.Session, opts ...Option) (*Client, error) {
+	c := &Client{session: session}
 	for _, option := range opts {
 		if err := option(c); err != nil {
 			return nil, err
@@ -31,6 +30,7 @@ func NewClient(ctx context.Context, config *aws.Config, opts ...Option) (*Client
 }
 
 // Subscribe method subscribes to the given SQS url
+// https://docs.aws.amazon.com/sdk-for-net/v2/developer-guide/QueueURL.html
 func (client *Client) Subscribe(ctx context.Context, url string) (*pubsub.Subscription, error) {
 	return awssnssqs.OpenSubscription(ctx, client.session, url, nil), nil
 }
