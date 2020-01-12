@@ -14,10 +14,12 @@ type Client struct {
 	session *session.Session
 }
 
-// Option is a self-refrential function for configuration
+// Option is a self-refrential function for configuration parameters
 type Option func(*Client) error
 
-// NewClient establishes session to the AWS cloud service.
+// NewClient returns *sqsdriver.Client, establishes session to the AWS cloud service.
+//
+// Additional configuration options can be added with sqsdriver.Option functions.
 func NewClient(ctx context.Context, session *session.Session, opts ...Option) (*Client, error) {
 	c := &Client{session: session}
 	for _, option := range opts {
@@ -29,7 +31,8 @@ func NewClient(ctx context.Context, session *session.Session, opts ...Option) (*
 	return c, nil
 }
 
-// Subscribe method subscribes to the given SQS url
+// Subscribe subscribes to the given SQS url
+//
 // https://docs.aws.amazon.com/sdk-for-net/v2/developer-guide/QueueURL.html
 func (client *Client) Subscribe(ctx context.Context, url string) (*pubsub.Subscription, error) {
 	return awssnssqs.OpenSubscription(ctx, client.session, url, nil), nil

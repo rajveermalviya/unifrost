@@ -17,8 +17,8 @@ Midgard (Earth), that is MCU reference which is able to transport people both
 ways. But because unifrost sends messages from server to client (only one way),
 hence unifrost. 😎
 
-It uses the [Go CDK](https://gocloud.dev) as vendor neutral pubsub driver that
-supports multiple pubsub vendors:
+It uses the [Go CDK](https://gocloud.dev) as broker neutral pubsub driver that
+supports multiple pubsub brokers:
 
 - Google Cloud Pub/Sub
 - Amazon Simple Queueing Service

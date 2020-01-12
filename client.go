@@ -9,7 +9,7 @@ import (
 	"gocloud.dev/pubsub"
 )
 
-// Client is a top-level struct that manages all the topics.
+// Client manages all the topic subscriptions.
 type Client struct {
 	ID             string
 	messageChannel chan message
@@ -25,7 +25,7 @@ type message struct {
 	payload []byte
 }
 
-// GetTopics returns a slice of all the topics client is subscribed to.
+// GetTopics returns a slice of all the topics the client is subscribed to.
 func (client *Client) GetTopics(ctx context.Context) []string {
 	client.mu.RLock()
 	defer client.mu.RUnlock()
@@ -38,7 +38,7 @@ func (client *Client) GetTopics(ctx context.Context) []string {
 	return topics
 }
 
-// TotalTopics reports the number of topics the client is subscribed to.
+// TotalTopics returns the number of topics the client is subscribed to.
 func (client *Client) TotalTopics(ctx context.Context) int {
 	client.mu.RLock()
 	defer client.mu.RUnlock()
@@ -47,6 +47,8 @@ func (client *Client) TotalTopics(ctx context.Context) int {
 
 // Connected reports whether client is connected to the server.
 func (client *Client) Connected() bool {
+	client.mu.RLock()
+	defer client.mu.RUnlock()
 	return client.connected
 }
 
@@ -58,6 +60,7 @@ func (client *Client) Close(ctx context.Context) error {
 	log.Printf("Closing client %s", client.ID)
 
 	if len(client.topics) > 0 {
+		// Wait for http connection to terminate
 		defer time.Sleep(time.Second)
 	}
 

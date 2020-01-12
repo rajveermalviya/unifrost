@@ -1,15 +1,15 @@
-// Package unifrost is a small package for relaying pubsub messages to the web
-// via SSE(EventSource).
-// It is loosely based on Twitter's implementation for real-time event-streaming
-// in their new web app.
+// Package unifrost is a go module for relaying pubsub messages to the web using SSE(Eventsource).
+// It is based on Twitter's implementation for real-time event-streaming in their new web app.
 //
-// It uses GO CDK (gocloud.dev) for pubsub, so it supports various vendors ->
+// Supported brokers
+//
 //   Google Cloud Pub/Sub
-//   Amazon Simple Queueing Service (SQS) (Pending)
+//   Amazon Simple Queueing Service
 //   Azure Service Bus (Pending)
 //   RabbitMQ
 //   NATS
 //   Kafka
 //   In-memory (Only for testing)
 //
+// For examples check https://github.com/unifrost/unifrost/tree/master/examples/
 package unifrost

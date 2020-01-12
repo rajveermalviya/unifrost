@@ -7,7 +7,7 @@ import (
 	"gocloud.dev/pubsub"
 )
 
-// SubscriberClient connects to the specific pubsub vendor using specific drivers,
+// SubscriberClient connects to the specific pubsub broker using specific drivers,
 // it also hides the specific driver implementation for subscribing to topics
 // And gives a single interface for all driver types.
 type SubscriberClient interface {
