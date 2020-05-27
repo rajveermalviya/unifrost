@@ -32,7 +32,7 @@ supports multiple pubsub brokers:
 
 unifrost supports Go modules and built against go version 1.13
 
-```shell
+```sh
 go get github.com/unifrost/unifrost
 ```
 
