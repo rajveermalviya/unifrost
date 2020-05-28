@@ -30,11 +30,11 @@ Connect to the event streamer using the [EventSource](https://developer.mozilla.
 in the browser or by using good old curl
 
 ```sh
-curl 'localhost:3000/events?id=custom_client'
+curl 'localhost:3000/events?id=unique_id'
 ```
 
-And in another terminal update the subscriptions of the client
+And in another terminal update the subscriptions of the consumer
 
 ```sh
-curl -d '{"client_id": "custom_client", "add": ["topic1", "topic2"], "remove": []}' -XPOST 'localhost:3000/update_subscriptions'
+curl -d '{"consumer_id": "unique_id", "add": ["topic1", "topic2"], "remove": []}' -XPOST 'localhost:3000/update_subscriptions'
 ```

@@ -43,9 +43,10 @@ func main() {
 		log.Fatalln("Error while creating new client: ", err)
 	}
 
-	streamer, err := unifrost.NewStreamer(
+	s, err := unifrost.NewStreamHandler(
+		ctx,
 		subClient,
-		unifrost.ClientTTL(2*time.Second),
+		unifrost.ConsumerTTL(2*time.Second),
 	)
 	if err != nil {
 		log.Fatalln("Error while starting streamer: ", err)
@@ -59,29 +60,29 @@ func main() {
 		log.Println("sig:", <-sigs)
 		log.Println("Gracefully closing the server")
 
-		if err := streamer.Close(ctx); err != nil {
+		if err := s.Close(ctx); err != nil {
 			log.Printf("Error occurred while closing the streamer: %v : closing forcefully", err)
 		}
 
 		os.Exit(0)
 	}()
 
-	// create a new custom_client for testing
-	c, _ := streamer.NewCustomClient(ctx, "custom_client")
-	log.Println("New client created:", c.ID)
+	// create a new custom consumer for testing
+	c, _ := s.NewCustomConsumer(ctx, "unique_id")
+	log.Println("New consumer created:", c.ID)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/update_subscriptions", updateSubscriptions(streamer))
+	mux.HandleFunc("/update_subscriptions", updateSubscriptions(s))
 	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
-		// Auto generate new client id, when new client connects.
+		// Auto generate new consumer id, when new consumer connects.
 		q := r.URL.Query()
 		if q.Get("id") == "" {
-			c, _ := streamer.NewClient(ctx)
+			c, _ := s.NewConsumer(ctx)
 			q.Set("id", c.ID)
 			r.URL.RawQuery = q.Encode()
 		}
 
-		streamer.ServeHTTP(w, r)
+		s.ServeHTTP(w, r)
 	})
 
 	log.Println("Starting server on port 3000")
@@ -90,8 +91,8 @@ func main() {
 }
 
 // updateSubscriptions is a helper handler to use the server without any
-// authentication for subscribing and unsubscribing to topics for a client
-func updateSubscriptions(streamer *unifrost.Streamer) http.HandlerFunc {
+// authentication for subscribing and unsubscribing to topics for a consumer
+func updateSubscriptions(streamer *unifrost.StreamHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method != "POST" {
@@ -104,9 +105,9 @@ func updateSubscriptions(streamer *unifrost.Streamer) http.HandlerFunc {
 		h.Set("Connection", "keep-alive")
 
 		type updateSubscriptionsData struct {
-			ClientID string   `json:"client_id,omitempty"`
-			Add      []string `json:"add,omitempty"`
-			Remove   []string `json:"remove,omitempty"`
+			ConsumerID string   `json:"consumer_id,omitempty"`
+			Add        []string `json:"add,omitempty"`
+			Remove     []string `json:"remove,omitempty"`
 		}
 
 		// Incoming request data
@@ -119,38 +120,42 @@ func updateSubscriptions(streamer *unifrost.Streamer) http.HandlerFunc {
 			return
 		}
 
-		// If the ID isn't provided, that means it is a new client
-		// So generate an ID and create a new client.
-		if reqData.ClientID == "" {
-			http.Error(w, "Client ID is required 'client_id'", http.StatusBadRequest)
+		// If the ID isn't provided, that means it is a new consumer
+		// So generate an ID and create a new consumer.
+		if reqData.ConsumerID == "" {
+			http.Error(w, "consumer id is required 'consumer_id'", http.StatusBadRequest)
+			return
+		}
+
+		consumer, err := streamer.GetConsumerByID(reqData.ConsumerID)
+		if err == unifrost.ErrConsumerNotFound {
+			http.Error(w, "invalid consumer ID", http.StatusUnauthorized)
 			return
 		}
 
 		ctx := r.Context()
 
 		for _, topic := range reqData.Add {
-			if err := streamer.Subscribe(ctx, reqData.ClientID, topic); err != nil {
-				if err == unifrost.ErrNoClient {
-					http.Error(w, "Invalid Client ID", http.StatusBadRequest)
-					return
+			if err := streamer.Subscribe(ctx, reqData.ConsumerID, topic); err != nil {
+				if err != nil {
+					log.Printf("unable to subscribe, %v", err)
+					continue
 				}
 			}
 		}
 
 		for _, topic := range reqData.Remove {
-			if err := streamer.Unsubscribe(ctx, reqData.ClientID, topic); err != nil {
-				if err == unifrost.ErrNoClient {
-					http.Error(w, "Invalid Client ID", http.StatusBadRequest)
-					return
+			if err := streamer.Unsubscribe(ctx, reqData.ConsumerID, topic); err != nil {
+				if err != nil {
+					log.Printf("unable to subscribe, %v", err)
+					continue
 				}
 			}
 		}
 
-		client := streamer.GetClient(ctx, reqData.ClientID)
+		log.Printf("consumer '%v' subscriptions updated, total topics subscribed: %v \n", consumer.ID, streamer.GetConsumerTopics(ctx, consumer))
 
-		log.Printf("Client '%v' subscriptions updated, total topics subscribed: %v \n", client.ID, client.TotalTopics(ctx))
-
-		// Return the ID of the client.
-		json.NewEncoder(w).Encode(map[string]string{"client_id": reqData.ClientID})
+		// Return the ID of the consumer.
+		json.NewEncoder(w).Encode(map[string]string{"consumer_id": reqData.ConsumerID})
 	}
 }
