@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package natsdriver contains NATS driver for unifrost.StreamHandler
 package natsdriver
 
 import (

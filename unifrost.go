@@ -32,10 +32,10 @@ import (
 // StreamHandler handles all the consumers and subscriptions.
 // It implements the http.Handler interface for easy embedding with any API server.
 type StreamHandler struct {
-	subClient         drivers.SubscriberClient
-	consumers         map[string]*Consumer
-	consumerTTLMillis time.Duration
-	subscriptions     map[string]*subscription
+	subClient     drivers.SubscriberClient
+	consumers     map[string]*Consumer
+	consumerTTL   time.Duration
+	subscriptions map[string]*subscription
 
 	addConsumerChan          chan consumerMessageg
 	closeConsumerChan        chan consumerMessageg
@@ -113,7 +113,7 @@ func NewStreamHandler(ctx context.Context, subClient drivers.SubscriberClient, o
 		subClient:                subClient,
 		consumers:                map[string]*Consumer{},
 		subscriptions:            map[string]*subscription{},
-		consumerTTLMillis:        time.Duration(time.Minute.Milliseconds()),
+		consumerTTL:              time.Duration(time.Minute),
 		addConsumerChan:          make(chan consumerMessageg),
 		closeConsumerChan:        make(chan consumerMessageg),
 		removeConsumerTopicChan:  make(chan consumerTopicMessage),
@@ -137,7 +137,7 @@ func NewStreamHandler(ctx context.Context, subClient drivers.SubscriberClient, o
 // default TTL is 1 minute
 func ConsumerTTL(t time.Duration) Option {
 	return func(s *StreamHandler) error {
-		s.consumerTTLMillis = time.Duration(t.Milliseconds())
+		s.consumerTTL = t
 		return nil
 	}
 }
@@ -368,7 +368,7 @@ func (s *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Stop the timeout timer if it is running.
-	if consumer.connected == false {
+	if !consumer.connected {
 		consumer.connected = true
 		consumer.ttlTimer.Stop()
 		consumer.timerStopped <- true
@@ -379,7 +379,7 @@ func (s *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d, _ := json.Marshal(map[string]interface{}{
 		"config": map[string]interface{}{
 			"consumer_id":         consumerID,
-			"consumer_ttl_millis": s.consumerTTLMillis,
+			"consumer_ttl_millis": s.consumerTTL.Milliseconds(),
 		},
 		"subscriptions": s.GetConsumerTopics(ctx, consumer),
 	})
@@ -399,7 +399,7 @@ func (s *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Printf("consumer %s disconnected", consumerID)
 
 		// When consumer gets disconnected start the timer
-		timer := time.NewTimer(s.consumerTTLMillis * time.Millisecond)
+		timer := time.NewTimer(s.consumerTTL)
 
 		consumer.ttlTimer = timer
 		consumer.connected = false
@@ -474,7 +474,7 @@ func (s *StreamHandler) NewConsumer(ctx context.Context) (*Consumer, error) {
 		ID:             uuid.New().String(),
 		messageChannel: make(chan message, 10),
 		topics:         map[string]struct{}{},
-		ttlTimer:       time.NewTimer(s.consumerTTLMillis * time.Millisecond),
+		ttlTimer:       time.NewTimer(s.consumerTTL * time.Millisecond),
 		connected:      true,
 	}
 
@@ -496,7 +496,7 @@ func (s *StreamHandler) NewCustomConsumer(ctx context.Context, consumerID string
 		ID:             consumerID,
 		messageChannel: make(chan message, 10),
 		topics:         map[string]struct{}{},
-		ttlTimer:       time.NewTimer(s.consumerTTLMillis * time.Millisecond),
+		ttlTimer:       time.NewTimer(s.consumerTTL * time.Millisecond),
 		connected:      true,
 	}
 

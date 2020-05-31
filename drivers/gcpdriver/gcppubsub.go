@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package gcpdriver contains Google Cloud Pub/Sub driver for unifrost.StreamHandler
 package gcpdriver
 
 import (

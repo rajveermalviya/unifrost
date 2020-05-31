@@ -197,7 +197,7 @@ func (s *StreamHandler) Unsubscribe(ctx context.Context, consumerID string, topi
 These methods can be used to add or remove subscriptions for a consumer.
 
 If you want to give subscription control to the client look at
-[the implementation](examples/nats_example) in the example.
+[the implementation](examples/nats_example/main.go#L95) in the example.
 
 To know more, check out the [example](examples/nats_example)
 

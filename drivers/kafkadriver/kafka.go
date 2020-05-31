@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package kafkadriver contains Apache Kafka message bus driver for unifrost.StreamHandler
 package kafkadriver
 
 import (

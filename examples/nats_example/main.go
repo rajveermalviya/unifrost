@@ -54,7 +54,7 @@ func main() {
 
 	// add a signal notifier to close the streamer gracefully
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt, os.Kill)
+	signal.Notify(sigs, os.Interrupt)
 
 	go func() {
 		log.Println("sig:", <-sigs)
