@@ -29,23 +29,35 @@ import (
 	"github.com/unifrost/unifrost/drivers"
 )
 
-// StreamHandler handles all the consumers and subscriptions.
-// It implements the http.Handler interface for easy embedding with any API server.
-type StreamHandler struct {
-	subClient     drivers.SubscriberClient
-	consumers     map[string]*Consumer
-	consumerTTL   time.Duration
-	subscriptions map[string]*subscription
+const (
+	// ERROR .
+	ERROR = iota
+	// EVENT .
+	EVENT
+)
 
-	addConsumerChan          chan consumerMessageg
-	closeConsumerChan        chan consumerMessageg
-	removeConsumerTopicChan  chan consumerTopicMessage
-	addSubscriptionChan      chan subscriptionMessage
-	removeSubscriptionChan   chan subscriptionMessage
-	shutdownSubscriptionChan chan topicMessage
+var (
+	// ErrConsumerNotFound is returned if the consumer-id is not registered in the StreamHandler.
+	ErrConsumerNotFound = errors.New("stream handler: consumer doesn't exists")
+)
+
+type message struct {
+	event       string
+	messageType int
+	payload     string
 }
 
-type consumerMessageg struct {
+// Consumer manages all the topic subscriptions.
+type Consumer struct {
+	ID             string
+	messageChannel chan message
+	topics         map[string]struct{}
+	ttlTimer       *time.Timer
+	connected      bool
+	timerStopped   chan bool
+}
+
+type consumerMessage struct {
 	c   *Consumer
 	ack chan struct{}
 }
@@ -73,36 +85,34 @@ type subscription struct {
 	shutdownChan chan struct{}
 }
 
-// Consumer manages all the topic subscriptions.
-type Consumer struct {
-	ID             string
-	messageChannel chan message
-	topics         map[string]struct{}
-	ttlTimer       *time.Timer
-	connected      bool
-	timerStopped   chan bool
+// StreamHandler handles all the consumers and subscriptions.
+// It implements the http.Handler interface for easy embedding with any API server.
+type StreamHandler struct {
+	subClient     drivers.SubscriberClient
+	consumers     map[string]*Consumer
+	consumerTTL   time.Duration
+	subscriptions map[string]*subscription
+
+	// All the management channels
+	addConsumerChan          chan consumerMessage
+	closeConsumerChan        chan consumerMessage
+	removeConsumerTopicChan  chan consumerTopicMessage
+	addSubscriptionChan      chan subscriptionMessage
+	removeSubscriptionChan   chan subscriptionMessage
+	shutdownSubscriptionChan chan topicMessage
 }
-
-const (
-	// ERROR .
-	ERROR = iota
-	// EVENT .
-	EVENT
-)
-
-type message struct {
-	event       string
-	messageType int
-	payload     string
-}
-
-var (
-	// ErrConsumerNotFound is returned if the consumer-id is not registered in the StreamHandler.
-	ErrConsumerNotFound = errors.New("stream handler: consumer doesn't exists")
-)
 
 // Option is a self-refrential function for configuration parameters
 type Option func(*StreamHandler) error
+
+// ConsumerTTL is an option that is used to set the consumer's TTL
+// default TTL is 1 minute
+func ConsumerTTL(t time.Duration) Option {
+	return func(s *StreamHandler) error {
+		s.consumerTTL = t
+		return nil
+	}
+}
 
 // NewStreamHandler returns *unifrost.StreamHandler, handles all the consumers and subscriptions.
 //
@@ -114,8 +124,8 @@ func NewStreamHandler(ctx context.Context, subClient drivers.SubscriberClient, o
 		consumers:                map[string]*Consumer{},
 		subscriptions:            map[string]*subscription{},
 		consumerTTL:              time.Duration(time.Minute),
-		addConsumerChan:          make(chan consumerMessageg),
-		closeConsumerChan:        make(chan consumerMessageg),
+		addConsumerChan:          make(chan consumerMessage),
+		closeConsumerChan:        make(chan consumerMessage),
 		removeConsumerTopicChan:  make(chan consumerTopicMessage),
 		addSubscriptionChan:      make(chan subscriptionMessage),
 		removeSubscriptionChan:   make(chan subscriptionMessage),
@@ -133,29 +143,20 @@ func NewStreamHandler(ctx context.Context, subClient drivers.SubscriberClient, o
 	return s, nil
 }
 
-// ConsumerTTL is an option that is used to set the consumer's TTL
-// default TTL is 1 minute
-func ConsumerTTL(t time.Duration) Option {
-	return func(s *StreamHandler) error {
-		s.consumerTTL = t
-		return nil
-	}
-}
-
 func (s *StreamHandler) managementService(ctx context.Context) {
 	for {
 		select {
 		case m := <-s.addConsumerChan:
 			s.consumers[m.c.ID] = m.c
-			m.ack <- struct{}{}
+			close(m.ack)
 
 		case m := <-s.closeConsumerChan:
 			s.closeConsumer(ctx, m.c)
-			m.ack <- struct{}{}
+			close(m.ack)
 
 		case m := <-s.removeConsumerTopicChan:
 			delete(m.c.topics, m.topic)
-			m.ack <- struct{}{}
+			close(m.ack)
 
 		case m := <-s.addSubscriptionChan:
 			m.errChan <- s.subscribe(ctx, m.consumerID, m.topic)
@@ -166,7 +167,7 @@ func (s *StreamHandler) managementService(ctx context.Context) {
 		case m := <-s.shutdownSubscriptionChan:
 			s.subscriptions[m.topic] = nil
 			delete(s.subscriptions, m.topic)
-			m.ack <- struct{}{}
+			close(m.ack)
 		}
 	}
 }
@@ -289,17 +290,9 @@ func (s *StreamHandler) subscribe(ctx context.Context, consumerID, topic string)
 					continue
 				}
 
-				d, _ := json.Marshal(map[string]interface{}{
-					"error": map[string]string{
-						"topic":   topic,
-						"code":    "subscription-failure",
-						"message": "Cannot receive message from subscription, closing subscription",
-					},
-				})
-
 				for _, c := range subscription.consumers {
 					if c.connected {
-						c.messageChannel <- message{event: "message", payload: string(d), messageType: ERROR}
+						c.messageChannel <- message{event: topic, payload: string(msg.Body), messageType: EVENT}
 					}
 				}
 				msg.Ack()
@@ -443,6 +436,7 @@ func (s *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // If specified consumer doesn't exists ErrConsumerNotFound error is returned.
 func (s *StreamHandler) Subscribe(ctx context.Context, consumerID string, topic string) error {
 	errChan := make(chan error)
+	defer close(errChan)
 
 	s.addSubscriptionChan <- subscriptionMessage{
 		consumerID: consumerID,
@@ -458,6 +452,7 @@ func (s *StreamHandler) Subscribe(ctx context.Context, consumerID string, topic 
 // If specified consumer doesn't exists ErrConsumerNotFound error is returned.
 func (s *StreamHandler) Unsubscribe(ctx context.Context, consumerID string, topic string) error {
 	errChan := make(chan error)
+	defer close(errChan)
 
 	s.removeSubscriptionChan <- subscriptionMessage{
 		consumerID: consumerID,
@@ -480,7 +475,7 @@ func (s *StreamHandler) NewConsumer(ctx context.Context) (*Consumer, error) {
 
 	ack := make(chan struct{})
 
-	s.addConsumerChan <- consumerMessageg{
+	s.addConsumerChan <- consumerMessage{
 		c:   c,
 		ack: ack,
 	}
@@ -502,7 +497,7 @@ func (s *StreamHandler) NewCustomConsumer(ctx context.Context, consumerID string
 
 	ack := make(chan struct{})
 
-	s.addConsumerChan <- consumerMessageg{
+	s.addConsumerChan <- consumerMessage{
 		c:   c,
 		ack: ack,
 	}
@@ -539,7 +534,7 @@ func (s *StreamHandler) CloseConsumer(ctx context.Context, consumerID string) er
 
 	ack := make(chan struct{})
 
-	s.closeConsumerChan <- consumerMessageg{
+	s.closeConsumerChan <- consumerMessage{
 		c:   c,
 		ack: ack,
 	}
